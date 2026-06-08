@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { loadFromFirestore, saveToFirestore } from "./firebase";
 
 const FONT_LINK = "https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap";
 
@@ -92,13 +93,9 @@ const SEED_CATEGORIES = [
   },
 ];
 
-// ─── Storage ──────────────────────────────────────────────────────────────────
-const STORAGE_KEY = "myvoice_v8";
-function loadData() {
-  try { const s = localStorage.getItem(STORAGE_KEY); if (s) return JSON.parse(s); } catch {}
-  return { categories: SEED_CATEGORIES, parentPin: "1234" };
-}
-function saveData(d) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {} }
+// ─── Storage (Firestore) ──────────────────────────────────────────────────────
+const SEED_DATA = { categories: SEED_CATEGORIES, parentPin: "1234" };
+function saveData(d) { saveToFirestore(d); }
 
 // ─── Speech (prefers male voice) ──────────────────────────────────────────────
 function speak(text) {
@@ -799,7 +796,8 @@ function HomeScreen({ categories, onSelectCategory, onOpenSettings, parentMode, 
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function MyVoiceApp() {
-  const [data, setData] = useState(loadData);
+  const [data, setData] = useState(SEED_DATA);
+  const [loaded, setLoaded] = useState(false);
   const [screen, setScreen] = useState("home");
   const [activeCategory, setActiveCategory] = useState(null);
   const [parentMode, setParentMode] = useState(false);
@@ -810,6 +808,11 @@ export default function MyVoiceApp() {
     const link = document.createElement("link");
     link.rel = "stylesheet"; link.href = FONT_LINK;
     document.head.appendChild(link);
+    // Load from Firestore on startup
+    loadFromFirestore(SEED_DATA).then(d => {
+      setData(d);
+      setLoaded(true);
+    });
   }, []);
 
   function persist(updated) { setData(updated); saveData(updated); }
@@ -828,6 +831,13 @@ export default function MyVoiceApp() {
 
   return (
     <div style={{ maxWidth:480,margin:"0 auto",fontFamily:"'Nunito',sans-serif" }}>
+      {!loaded && (
+        <div style={{ minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,background:"linear-gradient(135deg,#667eea,#764ba2)" }}>
+          <div style={{ fontSize:52 }}>🗣️</div>
+          <div style={{ color:"#fff",fontSize:22,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>My Voice</div>
+          <div style={{ color:"rgba(255,255,255,0.8)",fontSize:14,fontFamily:"'Nunito',sans-serif" }}>Loading...</div>
+        </div>
+      )}
       {showPinModal && (
         <PinModal title="Parent Mode" correctPin={data.parentPin}
           onSuccess={handlePinSuccess} onClose={()=>setShowPinModal(false)} />
