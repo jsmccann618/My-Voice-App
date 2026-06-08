@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     body: JSON.stringify({
       token: "aton7ur16z58dxjrf6bankpcd6mrme",
       user: "uwk9g771up4mgjpmmbwhqxhnmkrhk2",
-      title: "🗣️ My Voice",
+      title: "🗣️ Logan",
       message: message,
       sound: "magic",
     }),
