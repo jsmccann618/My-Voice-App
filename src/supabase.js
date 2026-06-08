@@ -18,9 +18,14 @@ export async function sendReply() {
 }
 
 export function subscribeToMessages(callback) {
-  return supabase.channel("messages")
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => { callback(payload.new); })
-    .subscribe();
+  const channel = supabase.channel("messages-channel");
+  channel.on(
+    "postgres_changes",
+    { event: "INSERT", schema: "public", table: "messages" },
+    (payload) => { callback(payload.new); }
+  );
+  channel.subscribe();
+  return channel;
 }
 
 export async function loadMessages() {
