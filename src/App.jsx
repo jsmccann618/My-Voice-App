@@ -578,6 +578,12 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
     setTimeout(()=>setConfetti(false), 1600);
     // Send to parent companion via Supabase
     sendMessage(text);
+    // Send push notification to parent's phone via Pushover
+    fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    }).catch(e => console.error("Notify error:", e));
   }
 
   return (
