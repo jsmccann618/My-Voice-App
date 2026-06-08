@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { loadFromFirestore, saveToFirestore } from "./firebase";
+import { sendMessage, subscribeToMessages, loadMessages, sendReply, markRead } from "./supabase";
 
 const FONT_LINK = "https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap";
 
@@ -575,6 +576,8 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
     setLastSpoken(text);
     setConfetti(true);
     setTimeout(()=>setConfetti(false), 1600);
+    // Send to parent companion via Supabase
+    sendMessage(text);
   }
 
   return (
@@ -755,7 +758,7 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
 }
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
-function HomeScreen({ categories, onSelectCategory, onOpenSettings, parentMode, onToggleParentMode }) {
+function HomeScreen({ categories, onSelectCategory, onOpenSettings, onOpenCompanion, parentMode, onToggleParentMode }) {
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#eef2ff 0%,#fafbff 100%)" }}>
       <div style={{ background:"linear-gradient(135deg,#667eea 0%,#764ba2 100%)",padding:"24px 24px 16px",boxShadow:"0 4px 24px rgba(102,126,234,0.3)" }}>
@@ -781,6 +784,9 @@ function HomeScreen({ categories, onSelectCategory, onOpenSettings, parentMode, 
                 ⚙️ Settings
               </button>
             )}
+            <button onClick={onOpenCompanion} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
+              📱 Parent View
+            </button>
           </div>
         </div>
       </div>
@@ -789,6 +795,130 @@ function HomeScreen({ categories, onSelectCategory, onOpenSettings, parentMode, 
         {categories.map((cat,i) => (
           <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode} onClick={()=>onSelectCategory(cat)} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── "On My Way" Banner (shows on his screen when parent replies) ─────────────
+function OnMyWayBanner({ show }) {
+  if (!show) return null;
+  return (
+    <div style={{
+      position:"fixed", top:0, left:0, right:0, zIndex:300,
+      background:"linear-gradient(135deg,#10B981,#047857)",
+      padding:"20px 24px", textAlign:"center",
+      boxShadow:"0 4px 24px rgba(16,185,129,0.5)",
+      animation:"slideDown 0.4s ease",
+    }}>
+      <div style={{ fontSize:48 }}>👍</div>
+      <div style={{ color:"#fff", fontSize:24, fontWeight:900, fontFamily:"'Nunito',sans-serif" }}>On my way!</div>
+      <style>{`@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}`}</style>
+    </div>
+  );
+}
+
+// ─── Parent Companion Screen ──────────────────────────────────────────────────
+function ParentCompanionScreen({ onBack }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Load recent messages
+    loadMessages().then(msgs => {
+      setMessages(msgs);
+      setLoading(false);
+    });
+    // Subscribe to new messages in real time
+    const sub = subscribeToMessages(msg => {
+      setMessages(prev => [msg, ...prev]);
+    });
+    return () => sub.unsubscribe();
+  }, []);
+
+  function formatTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+  }
+
+  async function handleReply(id) {
+    await markRead(id);
+    await sendReply();
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, read:true } : m));
+  }
+
+  const unread = messages.filter(m => !m.read && m.message !== "👍 On my way!");
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#f5f7ff", display:"flex", flexDirection:"column" }}>
+      {/* Header */}
+      <div style={{ background:"linear-gradient(135deg,#667eea,#764ba2)", padding:"16px 20px", display:"flex", alignItems:"center", gap:14, boxShadow:"0 4px 20px rgba(0,0,0,0.12)" }}>
+        <button onClick={onBack} style={{ background:"rgba(255,255,255,0.25)",border:"none",borderRadius:12,width:44,height:44,cursor:"pointer",fontSize:22,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>←</button>
+        <div style={{ flex:1 }}>
+          <div style={{ color:"#fff", fontSize:19, fontWeight:800, fontFamily:"'Nunito',sans-serif" }}>
+            📱 Parent View
+          </div>
+          <div style={{ color:"rgba(255,255,255,0.8)", fontSize:13, fontFamily:"'Nunito',sans-serif" }}>
+            {unread.length > 0 ? `${unread.length} new request${unread.length > 1 ? "s" : ""}` : "All caught up!"}
+          </div>
+        </div>
+        {unread.length > 0 && (
+          <div style={{ background:"#EF4444", color:"#fff", borderRadius:"50%", width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontFamily:"'Nunito',sans-serif", fontSize:14 }}>
+            {unread.length}
+          </div>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex:1, overflowY:"auto", padding:"16px 16px 40px" }}>
+        {loading && (
+          <div style={{ textAlign:"center", padding:40, color:"#aaa", fontFamily:"'Nunito',sans-serif" }}>Loading...</div>
+        )}
+        {!loading && messages.length === 0 && (
+          <div style={{ textAlign:"center", padding:40, color:"#aaa", fontFamily:"'Nunito',sans-serif", fontSize:15 }}>
+            No messages yet — waiting for him to make a request!
+          </div>
+        )}
+        {messages.map(msg => {
+          const isReply = msg.message === "👍 On my way!";
+          const isUnread = !msg.read && !isReply;
+          return (
+            <div key={msg.id} style={{
+              background: isReply ? "#f0fdf4" : isUnread ? "#fff7ed" : "#fff",
+              borderRadius:18, padding:"14px 16px", marginBottom:12,
+              boxShadow:"0 3px 12px rgba(0,0,0,0.07)",
+              borderLeft: isUnread ? "4px solid #F59E0B" : isReply ? "4px solid #10B981" : "4px solid #e0e0e0",
+            }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:isUnread ? 10 : 0 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:20 }}>{isReply ? "👍" : "🗣️"}</span>
+                  <div>
+                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, color:"#1a1a2e" }}>
+                      {msg.message}
+                    </div>
+                    <div style={{ fontFamily:"'Nunito',sans-serif", fontSize:12, color:"#999", marginTop:2 }}>
+                      {formatTime(msg.created_at)}
+                    </div>
+                  </div>
+                </div>
+                {isUnread && (
+                  <span style={{ background:"#F59E0B", color:"#fff", borderRadius:8, padding:"2px 10px", fontSize:11, fontWeight:800, fontFamily:"'Nunito',sans-serif" }}>NEW</span>
+                )}
+              </div>
+              {isUnread && (
+                <button onClick={() => handleReply(msg.id)} style={{
+                  width:"100%", padding:"10px 0", borderRadius:12, border:"none",
+                  background:"linear-gradient(135deg,#10B981,#047857)",
+                  color:"#fff", fontSize:15, fontWeight:800,
+                  fontFamily:"'Nunito',sans-serif", cursor:"pointer",
+                  boxShadow:"0 4px 12px rgba(16,185,129,0.3)",
+                }}>
+                  👍 On my way!
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -803,6 +933,7 @@ export default function MyVoiceApp() {
   const [parentMode, setParentMode] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinAction, setPinAction] = useState(null);
+  const [showOnMyWay, setShowOnMyWay] = useState(false);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -813,6 +944,15 @@ export default function MyVoiceApp() {
       setData(d);
       setLoaded(true);
     });
+    // Listen for "On my way!" replies from parent
+    const sub = subscribeToMessages(msg => {
+      if (msg.message === "👍 On my way!") {
+        setShowOnMyWay(true);
+        speak("On my way!");
+        setTimeout(() => setShowOnMyWay(false), 4000);
+      }
+    });
+    return () => sub?.unsubscribe?.();
   }, []);
 
   function persist(updated) { setData(updated); saveData(updated); }
@@ -831,6 +971,7 @@ export default function MyVoiceApp() {
 
   return (
     <div style={{ maxWidth:480,margin:"0 auto",fontFamily:"'Nunito',sans-serif" }}>
+      <OnMyWayBanner show={showOnMyWay} />
       {!loaded && (
         <div style={{ minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,background:"linear-gradient(135deg,#667eea,#764ba2)" }}>
           <div style={{ fontSize:52 }}>🗣️</div>
@@ -842,11 +983,12 @@ export default function MyVoiceApp() {
         <PinModal title="Parent Mode" correctPin={data.parentPin}
           onSuccess={handlePinSuccess} onClose={()=>setShowPinModal(false)} />
       )}
-      {screen==="home" && (
+      {loaded && screen==="home" && (
         <HomeScreen categories={data.categories} parentMode={parentMode}
           onSelectCategory={cat=>{ setActiveCategory(cat); setScreen("category"); }}
           onToggleParentMode={handleToggleParent}
-          onOpenSettings={()=>setScreen("settings")} />
+          onOpenSettings={()=>setScreen("settings")}
+          onOpenCompanion={()=>setScreen("companion")} />
       )}
       {screen==="category" && activeCategory && (
         <CategoryScreen
@@ -855,7 +997,10 @@ export default function MyVoiceApp() {
           onBack={()=>setScreen("home")}
           onUpdateCategory={updateCategory} />
       )}
-      {screen==="settings" && (
+      {loaded && screen==="companion" && (
+        <ParentCompanionScreen onBack={()=>setScreen("home")} />
+      )}
+      {loaded && screen==="settings" && (
         <SettingsScreen categories={data.categories} currentPin={data.parentPin}
           onUpdateCategories={updateAllCategories}
           onChangePin={pin=>persist({...data,parentPin:pin})}
