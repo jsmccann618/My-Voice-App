@@ -191,7 +191,7 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const DEEP_LINKS = {
     "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
     "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
-    "amazon music":  { app: "com.amazon.mp3://", web: "https://music.amazon.com" },
+    "amazon music":  { app: "https://music.amazon.com", web: "https://music.amazon.com" },
     "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
     "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
     "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
