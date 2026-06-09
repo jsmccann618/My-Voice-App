@@ -191,7 +191,7 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const DEEP_LINKS = {
     "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
     "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
-    "amazon music":  { app: "amzn://music",    web: "https://music.amazon.com" },
+    "amazon music":  { app: "com.amazon.mp3://", web: "https://music.amazon.com" },
     "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
     "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
     "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
@@ -212,21 +212,9 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
     const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
 
     if (deepLink) {
-      // Use hidden iframe to attempt app open without Safari error
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.src = deepLink.app;
-      document.body.appendChild(iframe);
+      window.location = deepLink.app;
       setTimeout(() => {
-        document.body.removeChild(iframe);
-        // If still here after delay, open web fallback
-      }, 1500);
-      // Also set a timer to open web version if app didn't open
-      const start = Date.now();
-      setTimeout(() => {
-        if (document.visibilityState !== "hidden") {
-          window.open(deepLink.web, "_blank");
-        }
+        window.open(deepLink.web, "_blank");
       }, 2000);
     }
   }
