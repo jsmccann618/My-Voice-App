@@ -99,8 +99,8 @@ const SEED_CATEGORIES = [
       {
         id:"l1", name:"Amazon Music", emoji:"🎵", photo:null,
         logo:"https://m.media-amazon.com/images/G/01/digital/music/player/web/GM-image-US-en.png",
-        appLink:"amzn://music/player?ref=dm_sh_QGw8Z2flZQkGT2qf5i-wFMpN5e",
-        webLink:"https://music.amazon.com/user-playlist/.7e3811cb6f5b46e393412e79785cbb73sune?ref=dm_sh_QGw8Z2flZQkGT2qf5i-wFMpN5e",
+        appLink:"https://music.amazon.com/user-playlist/.7e3811cb6f5b46e393412e79785cbb73sune",
+        webLink:"https://music.amazon.com/user-playlist/.7e3811cb6f5b46e393412e79785cbb73sune",
       },
     ],
   },
@@ -192,7 +192,7 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const DEEP_LINKS = {
     "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
     "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
-    "amazon music":  { app: "amzn://music/player?ref=dm_sh_QGw8Z2flZQkGT2qf5i-wFMpN5e", web: "https://music.amazon.com/user-playlist/.7e3811cb6f5b46e393412e79785cbb73sune?ref=dm_sh_QGw8Z2flZQkGT2qf5i-wFMpN5e" },
+    "amazon music":  { app: "https://music.amazon.com/user-playlist/.7e3811cb6f5b46e393412e79785cbb73sune", web: "https://music.amazon.com/user-playlist/.7e3811cb6f5b46e393412e79785cbb73sune" },
     "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
     "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
     "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
