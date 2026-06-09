@@ -187,6 +187,18 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const blobPath = BLOB_PATHS[index % BLOB_PATHS.length];
   const uid = `bc_${item.id}`;
 
+  // Auto deep link map — if item name matches, open the app
+  const DEEP_LINKS = {
+    "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
+    "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
+    "amazon music":  { app: "amzn-music://",   web: "https://music.amazon.com" },
+    "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
+    "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
+    "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
+    "apple music":   { app: "music://",        web: "https://music.apple.com" },
+    "youtube kids":  { app: "youtubekids://",  web: "https://www.youtubekids.com" },
+  };
+
   function handlePress() {
     if (parentMode) return;
     setSquish(true);
@@ -194,11 +206,16 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
     const full = phrase ? `${phrase} ${item.name}` : item.name;
     speak(full);
     onSpeak(full);
-    if (item.appLink) {
+
+    // Check item's own appLink first, then check name against deep link map
+    const nameKey = item.name.toLowerCase().trim();
+    const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
+
+    if (deepLink) {
       const start = Date.now();
-      window.location = item.appLink;
+      window.location = deepLink.app;
       setTimeout(() => {
-        if (Date.now() - start < 2000) window.open(item.webLink, "_blank");
+        if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
       }, 1500);
     }
   }
