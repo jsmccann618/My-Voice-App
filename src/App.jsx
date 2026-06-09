@@ -94,9 +94,56 @@ const SEED_CATEGORIES = [
   },
 ];
 
-// ─── Storage (Firestore) ──────────────────────────────────────────────────────
+// ─── Storage (Firestore + localStorage for photos) ───────────────────────────
 const SEED_DATA = { categories: SEED_CATEGORIES, parentPin: "1234" };
-function saveData(d) { saveToFirestore(d); }
+const PHOTO_KEY = "myvoice_photos_v1";
+
+function savePhotos(categories) {
+  try {
+    const photos = {};
+    categories.forEach(cat => {
+      if (cat.photo) photos[`cat_${cat.id}`] = cat.photo;
+      cat.items?.forEach(item => {
+        if (item.photo) photos[`item_${item.id}`] = item.photo;
+      });
+    });
+    localStorage.setItem(PHOTO_KEY, JSON.stringify(photos));
+  } catch(e) { console.error("Photo save error:", e); }
+}
+
+function loadPhotos() {
+  try {
+    const s = localStorage.getItem(PHOTO_KEY);
+    return s ? JSON.parse(s) : {};
+  } catch { return {}; }
+}
+
+function mergePhotos(categories, photos) {
+  return categories.map(cat => ({
+    ...cat,
+    photo: photos[`cat_${cat.id}`] || cat.photo || null,
+    items: cat.items?.map(item => ({
+      ...item,
+      photo: photos[`item_${item.id}`] || item.photo || null,
+    })) || [],
+  }));
+}
+
+function stripPhotos(categories) {
+  return categories.map(cat => ({
+    ...cat,
+    photo: null,
+    items: cat.items?.map(item => ({ ...item, photo: null })) || [],
+  }));
+}
+
+function saveData(d) {
+  // Save photos to localStorage (they're too big for Firestore)
+  savePhotos(d.categories);
+  // Save structure to Firestore with photos stripped out
+  const stripped = { ...d, categories: stripPhotos(d.categories) };
+  saveToFirestore(stripped);
+}
 
 // ─── Speech (prefers male voice) ──────────────────────────────────────────────
 function speak(text) {
@@ -945,9 +992,11 @@ export default function MyVoiceApp() {
     const link = document.createElement("link");
     link.rel = "stylesheet"; link.href = FONT_LINK;
     document.head.appendChild(link);
-    // Load from Firestore on startup
+    // Load from Firestore on startup, then merge photos from localStorage
     loadFromFirestore(SEED_DATA).then(d => {
-      setData(d);
+      const photos = loadPhotos();
+      const merged = { ...d, categories: mergePhotos(d.categories, photos) };
+      setData(merged);
       setLoaded(true);
     });
     // Listen for "On my way!" replies from parent
