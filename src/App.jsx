@@ -92,6 +92,17 @@ const SEED_CATEGORIES = [
       },
     ],
   },
+  {
+    id:"listen", label:"I Want to Listen", emoji:"🎵", photo:null,
+    color:"#EC4899", dark:"#BE185D", light:"#F9A8D4", phrase:"I want to listen to",
+    items:[
+      {
+        id:"l1", name:"Amazon Music", emoji:"🎵", photo:null,
+        logo:"https://m.media-amazon.com/images/G/01/digital/music/player/web/GM-image-US-en.png",
+        appLink:"music://", webLink:"https://music.amazon.com",
+      },
+    ],
+  },
 ];
 
 // ─── Storage (Firestore + Firebase Storage for photos) ───────────────────────
