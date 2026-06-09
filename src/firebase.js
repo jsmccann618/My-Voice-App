@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAMptXnYzKpKMJZkRgdhvftRl_4BZzKoTk",
@@ -12,17 +13,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 const DOC_REF = doc(db, "myvoice", "appdata");
 
-// Load data from Firestore, fall back to local seed if nothing saved yet
+// ─── Firestore ────────────────────────────────────────────────────────────────
 export async function loadFromFirestore(seedData) {
   try {
     const snap = await getDoc(DOC_REF);
-    if (snap.exists()) {
-      return snap.data();
-    }
-    // First run — save seed data to Firestore
+    if (snap.exists()) return snap.data();
     await setDoc(DOC_REF, seedData);
     return seedData;
   } catch (e) {
@@ -31,7 +30,6 @@ export async function loadFromFirestore(seedData) {
   }
 }
 
-// Save data to Firestore
 export async function saveToFirestore(data) {
   try {
     await setDoc(DOC_REF, data);
@@ -40,9 +38,30 @@ export async function saveToFirestore(data) {
   }
 }
 
-// Subscribe to real-time updates (for parent companion mode later)
-export function subscribeToChanges(callback) {
-  return onSnapshot(DOC_REF, (snap) => {
-    if (snap.exists()) callback(snap.data());
-  });
+// ─── Firebase Storage (photos) ────────────────────────────────────────────────
+
+// Upload a base64 photo to Firebase Storage, return the download URL
+export async function uploadPhoto(base64Data, path) {
+  try {
+    const storageRef = ref(storage, path);
+    // Strip the data:image/...;base64, prefix
+    const base64String = base64Data.includes(",") ? base64Data.split(",")[1] : base64Data;
+    const format = base64Data.includes("jpeg") ? "jpeg" : "png";
+    await uploadString(storageRef, base64String, "base64", { contentType: `image/${format}` });
+    const url = await getDownloadURL(storageRef);
+    return url;
+  } catch (e) {
+    console.error("Storage upload error:", e);
+    return null;
+  }
+}
+
+// Delete a photo from Firebase Storage
+export async function deletePhoto(path) {
+  try {
+    const storageRef = ref(storage, path);
+    await deleteObject(storageRef);
+  } catch (e) {
+    console.error("Storage delete error:", e);
+  }
 }
