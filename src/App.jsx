@@ -661,6 +661,8 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text }),
     }).catch(e => console.error("Notify error:", e));
+    // Navigate back to home screen after a short delay so he sees the confetti
+    setTimeout(() => onBack(), 2000);
   }
 
   return (
@@ -749,7 +751,7 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
       photoUrl = await handlePhotoUpload(photo, `categories/${showCatPhoto}/cover`);
     }
     onUpdateCategories(categories.map(c=>c.id===showCatPhoto?{...c,photo:photoUrl}:c));
-    setShowCatPhoto(null);
+    setShowCatPhoto(null); // Auto-close modal after save
   }
 
   function handleDeleteCat(id) {
