@@ -744,14 +744,18 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
   const CAT_EMOJIS = ["📌","🏠","🎯","🌟","💡","🎨","🎵","🏆","🍀","🔔","🎒","🌍","🧠","💪","🛡️","🔑"];
   const [selColor, setSelColor] = useState(CAT_COLORS[0]);
 
-  async function handleCatPhotoSave({ photo }) {
-    if (!photo) return;
-    let photoUrl = photo;
+  async function handleCatPhotoSave({ photo, emoji }) {
+    let photoUrl = null;
     if (photo && photo.startsWith("data:")) {
+      // Upload photo to Firebase Storage
       photoUrl = await handlePhotoUpload(photo, `categories/${showCatPhoto}/cover`);
+    } else if (photo && photo.startsWith("http")) {
+      // Already a URL
+      photoUrl = photo;
     }
-    onUpdateCategories(categories.map(c=>c.id===showCatPhoto?{...c,photo:photoUrl}:c));
-    setShowCatPhoto(null); // Auto-close modal after save
+    // Update category with new photo URL (or null if emoji was chosen — emoji shows as fallback)
+    onUpdateCategories(categories.map(c=>c.id===showCatPhoto ? { ...c, photo: photoUrl } : c));
+    setShowCatPhoto(null);
   }
 
   function handleDeleteCat(id) {
