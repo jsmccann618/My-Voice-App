@@ -337,19 +337,20 @@ function CameraBlobCard({ color, dark, light, onPress, index }) {
 }
 
 // ─── Home Blob Card ───────────────────────────────────────────────────────────
-function HomeBlobCard({ cat, onClick, parentMode, index }) {
+function HomeBlobCard({ cat, onClick, parentMode, index, onEdit }) {
   const [squish, setSquish] = useState(false);
   const blobPath = BLOB_PATHS[index % BLOB_PATHS.length];
   const uid = `hbc_${cat.id}`;
 
   function handleClick() {
+    if (parentMode) { onEdit(cat); return; }
     setSquish(true);
     setTimeout(() => setSquish(false), 300);
     onClick();
   }
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", position:"relative" }}>
       <button onClick={handleClick} style={{
         background:"none", border:"none", cursor:"pointer", padding:0,
         display:"flex", flexDirection:"column", alignItems:"center",
@@ -388,6 +389,80 @@ function HomeBlobCard({ cat, onClick, parentMode, index }) {
         lineHeight:1.2, maxWidth:160, marginTop:6,
       }}>{cat.label}</span>
       <span style={{ fontSize:11, color:"#aaa", fontFamily:"'Nunito',sans-serif", marginTop:2 }}>{cat.items.length} items</span>
+      {parentMode && (
+        <div style={{ fontSize:11, color:"#667eea", fontFamily:"'Nunito',sans-serif", fontWeight:700, marginTop:2 }}>✏️ tap to edit</div>
+      )}
+    </div>
+  );
+}
+
+// ─── Edit Category Modal ──────────────────────────────────────────────────────
+function EditCategoryModal({ cat, onSave, onClose }) {
+  const [name, setName] = useState(cat.label);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function handlePhotoSave({ photo }) {
+    setSaving(true);
+    let photoUrl = null;
+    if (photo && photo.startsWith("data:")) {
+      photoUrl = await handlePhotoUpload(photo, `categories/${cat.id}/cover_${Date.now()}`);
+    } else if (photo && photo.startsWith("http")) {
+      photoUrl = photo;
+    }
+    onSave({ ...cat, label: name.trim(), photo: photoUrl });
+    setSaving(false);
+    setShowPhotoPicker(false);
+    onClose();
+  }
+
+  function handleSaveNameOnly() {
+    if (!name.trim()) return;
+    onSave({ ...cat, label: name.trim() });
+    onClose();
+  }
+
+  return (
+    <div style={{ position:"fixed",inset:0,zIndex:150,background:"rgba(0,0,0,0.62)",display:"flex",alignItems:"center",justifyContent:"center",padding:16 }}>
+      {showPhotoPicker ? (
+        <PhotoPickerModal
+          title={saving ? "Saving..." : "Change Category Image"}
+          color={cat.color}
+          onSave={handlePhotoSave}
+          onClose={()=>setShowPhotoPicker(false)}
+          showNameField={false}
+        />
+      ) : (
+        <div style={{ background:"#fff",borderRadius:24,width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,0.35)" }}>
+          <div style={{ background:cat.color,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",borderRadius:"24px 24px 0 0" }}>
+            <span style={{ color:"#fff",fontSize:18,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>Edit Category</span>
+            <button onClick={onClose} style={{ background:"rgba(255,255,255,0.3)",border:"none",borderRadius:"50%",width:34,height:34,cursor:"pointer",fontSize:18,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>✕</button>
+          </div>
+          <div style={{ padding:20 }}>
+            {/* Name */}
+            <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:13,color:"#666",marginBottom:8 }}>Category Name</div>
+            <input value={name} onChange={e=>setName(e.target.value)}
+              placeholder="Category name"
+              style={{ width:"100%",padding:"12px 16px",borderRadius:14,border:"2px solid #e0e0e0",fontSize:16,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:"none",boxSizing:"border-box",marginBottom:16 }} />
+
+            {/* Change image button */}
+            <button onClick={()=>setShowPhotoPicker(true)} style={{
+              width:"100%",padding:12,borderRadius:14,border:`2px solid ${cat.color}`,
+              background:"transparent",color:cat.color,fontSize:15,fontWeight:800,
+              fontFamily:"'Nunito',sans-serif",cursor:"pointer",marginBottom:12,
+            }}>
+              📷 Change Image
+            </button>
+
+            {/* Save name button */}
+            <button onClick={handleSaveNameOnly} disabled={!name.trim()} style={{
+              width:"100%",padding:14,borderRadius:14,border:"none",
+              background:name.trim()?cat.color:"#ccc",color:"#fff",fontSize:17,fontWeight:800,
+              fontFamily:"'Nunito',sans-serif",cursor:name.trim()?"pointer":"not-allowed",
+            }}>✅ Save Name</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -799,34 +874,17 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
         <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:16,color:"#1a1a2e",marginBottom:12 }}>Categories</div>
         <div style={{ display:"flex",flexDirection:"column",gap:12,marginBottom:20 }}>
           {categories.map(cat=>(
-            <div key={cat.id} style={{ background:"#fff",borderRadius:18,padding:"14px 16px",boxShadow:"0 3px 12px rgba(0,0,0,0.07)" }}>
-              <div style={{ display:"flex",alignItems:"center",gap:14,marginBottom:10 }}>
-                <div style={{ width:52,height:52,borderRadius:12,overflow:"hidden",background:cat.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                  {cat.photo ? <img src={cat.photo} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:28 }}>{cat.emoji}</span>}
-                </div>
-                <div style={{ flex:1,minWidth:0 }}>
-                  <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:15,color:"#1a1a2e",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{cat.label}</div>
-                  <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>{cat.items.length} items</div>
-                </div>
-                <div style={{ display:"flex",gap:8 }}>
-                  <button onClick={()=>setShowCatPhoto(cat.id)} style={{ background:cat.color,border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>📷</button>
-                  <button onClick={()=>handleDeleteCat(cat.id)} style={{ background:"#fee2e2",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#EF4444",fontWeight:700 }}>🗑️</button>
-                </div>
+            <div key={cat.id} style={{ background:"#fff",borderRadius:18,padding:"14px 16px",display:"flex",alignItems:"center",gap:14,boxShadow:"0 3px 12px rgba(0,0,0,0.07)" }}>
+              <div style={{ width:52,height:52,borderRadius:12,overflow:"hidden",background:cat.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                {cat.photo ? <img src={cat.photo} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:28 }}>{cat.emoji}</span>}
               </div>
-              {/* Phrase editor */}
-              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999",flexShrink:0 }}>Speaks:</div>
-                <input
-                  defaultValue={cat.phrase}
-                  onBlur={e => {
-                    const newPhrase = e.target.value.trim();
-                    if (newPhrase !== cat.phrase) {
-                      onUpdateCategories(categories.map(c => c.id===cat.id ? {...c, phrase:newPhrase} : c));
-                    }
-                  }}
-                  placeholder="Spoken phrase (e.g. I want)"
-                  style={{ flex:1,padding:"6px 10px",borderRadius:10,border:"1.5px solid #e0e0e0",fontSize:13,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:"none",color:"#1a1a2e" }}
-                />
+              <div style={{ flex:1,minWidth:0 }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:15,color:"#1a1a2e",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{cat.label}</div>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>{cat.items.length} items</div>
+              </div>
+              <div style={{ display:"flex",gap:8 }}>
+                <button onClick={()=>setShowCatPhoto(cat.id)} style={{ background:cat.color,border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>📷</button>
+                <button onClick={()=>handleDeleteCat(cat.id)} style={{ background:"#fee2e2",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#EF4444",fontWeight:700 }}>🗑️</button>
               </div>
             </div>
           ))}
@@ -1053,6 +1111,7 @@ export default function MyVoiceApp() {
   const [showOnMyWay, setShowOnMyWay] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [editCat, setEditCat] = useState(null);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -1182,6 +1241,15 @@ export default function MyVoiceApp() {
             </div>
           </div>
 
+          {/* Edit Category Modal */}
+          {editCat && (
+            <EditCategoryModal
+              cat={editCat}
+              onSave={c => { updateCategory(c); setEditCat(null); }}
+              onClose={()=>setEditCat(null)}
+            />
+          )}
+
           {/* Category Grid OR Search Results */}
           <div style={{ padding:"16px 10px 40px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, alignItems:"start" }}>
             {globalSearch ? (
@@ -1217,7 +1285,10 @@ export default function MyVoiceApp() {
               )
             ) : (
               data.categories.map((cat,i) => (
-                <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode} onClick={()=>{ setActiveCategory(cat); setScreen("category"); }} />
+                <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode}
+                  onClick={()=>{ setActiveCategory(cat); setScreen("category"); }}
+                  onEdit={setEditCat}
+                />
               ))
             )}
           </div>
