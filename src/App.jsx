@@ -472,12 +472,20 @@ function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, i
 
   function handleFile(e) {
     const f=e.target.files[0]; if(!f) return;
-    const r=new FileReader(); r.onload=ev=>setPhoto(ev.target.result); r.readAsDataURL(f);
+    const r=new FileReader();
+    r.onload=ev=>{
+      setPhoto(ev.target.result);
+      cam.stop();
+    };
+    r.onerror=()=>console.error("FileReader error");
+    r.readAsDataURL(f);
   }
 
   function handleSave() {
     if (showNameField && !name.trim()) return;
-    onSave({ name:name.trim(), emoji, photo });
+    // On emoji tab, explicitly pass null for photo so emoji shows
+    const photoToSave = tab === "emoji" ? null : photo;
+    onSave({ name:name.trim(), emoji, photo:photoToSave });
   }
 
   const canSave = showNameField ? !!name.trim() : true;
@@ -737,7 +745,7 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
   async function handleCatPhotoSave({ photo }) {
     if (!photo) return;
     let photoUrl = photo;
-    if (photo && !photo.startsWith("http")) {
+    if (photo && photo.startsWith("data:")) {
       photoUrl = await handlePhotoUpload(photo, `categories/${showCatPhoto}/cover`);
     }
     onUpdateCategories(categories.map(c=>c.id===showCatPhoto?{...c,photo:photoUrl}:c));
