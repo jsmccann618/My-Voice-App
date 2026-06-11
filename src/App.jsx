@@ -337,13 +337,12 @@ function CameraBlobCard({ color, dark, light, onPress, index }) {
 }
 
 // ─── Home Blob Card ───────────────────────────────────────────────────────────
-function HomeBlobCard({ cat, onClick, parentMode, index, onEdit }) {
+function HomeBlobCard({ cat, onClick, parentMode, index }) {
   const [squish, setSquish] = useState(false);
   const blobPath = BLOB_PATHS[index % BLOB_PATHS.length];
   const uid = `hbc_${cat.id}`;
 
   function handleClick() {
-    if (parentMode) { onEdit(cat); return; }
     setSquish(true);
     setTimeout(() => setSquish(false), 300);
     onClick();
@@ -389,9 +388,6 @@ function HomeBlobCard({ cat, onClick, parentMode, index, onEdit }) {
         lineHeight:1.2, maxWidth:160, marginTop:6,
       }}>{cat.label}</span>
       <span style={{ fontSize:11, color:"#aaa", fontFamily:"'Nunito',sans-serif", marginTop:2 }}>{cat.items.length} items</span>
-      {parentMode && (
-        <div style={{ fontSize:11, color:"#667eea", fontFamily:"'Nunito',sans-serif", fontWeight:700, marginTop:2 }}>✏️ tap to edit</div>
-      )}
     </div>
   );
 }
@@ -808,7 +804,13 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
 // ─── Settings Screen ──────────────────────────────────────────────────────────
 function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, currentPin }) {
   const [showCatPhoto, setShowCatPhoto] = useState(null);
+  const [showEditCat, setShowEditCat] = useState(null);
   const [showAddCat, setShowAddCat] = useState(false);
+
+  function handleCatEdit(updatedCat) {
+    onUpdateCategories(categories.map(c => c.id===updatedCat.id ? updatedCat : c));
+    setShowEditCat(null);
+  }
   const [newCatName, setNewCatName] = useState("");
   const [newCatPhrase, setNewCatPhrase] = useState("");
   const [newCatEmoji, setNewCatEmoji] = useState("📌");
@@ -874,6 +876,9 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
         <PhotoPickerModal title={savingPhoto ? "Saving..." : "Set Category Photo"} color="#667eea"
           onSave={handleCatPhotoSave} onClose={()=>!savingPhoto && setShowCatPhoto(null)} showNameField={false} />
       )}
+      {showEditCat && (
+        <EditCategoryModal cat={showEditCat} onSave={handleCatEdit} onClose={()=>setShowEditCat(null)} />
+      )}
       <div style={{ background:"linear-gradient(135deg,#667eea,#764ba2)",padding:"16px 20px",display:"flex",alignItems:"center",gap:14 }}>
         <button onClick={onBack} style={{ background:"rgba(255,255,255,0.25)",border:"none",borderRadius:12,width:44,height:44,cursor:"pointer",fontSize:22,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>←</button>
         <div style={{ color:"#fff",fontSize:20,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>⚙️ Parent Settings</div>
@@ -888,9 +893,10 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
               </div>
               <div style={{ flex:1,minWidth:0 }}>
                 <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:15,color:"#1a1a2e",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{cat.label}</div>
-                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>{cat.items.length} items</div>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>{cat.items.length} items · "{cat.phrase}"</div>
               </div>
               <div style={{ display:"flex",gap:8 }}>
+                <button onClick={()=>setShowEditCat(cat)} style={{ background:"#667eea",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>✏️</button>
                 <button onClick={()=>setShowCatPhoto(cat.id)} style={{ background:cat.color,border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>📷</button>
                 <button onClick={()=>handleDeleteCat(cat.id)} style={{ background:"#fee2e2",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#EF4444",fontWeight:700 }}>🗑️</button>
               </div>
@@ -1119,7 +1125,6 @@ export default function MyVoiceApp() {
   const [showOnMyWay, setShowOnMyWay] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
-  const [editCat, setEditCat] = useState(null);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -1248,15 +1253,6 @@ export default function MyVoiceApp() {
               )}
             </div>
           </div>
-
-          {/* Edit Category Modal */}
-          {editCat && (
-            <EditCategoryModal
-              cat={editCat}
-              onSave={c => { updateCategory(c); setEditCat(null); }}
-              onClose={()=>setEditCat(null)}
-            />
-          )}
 
           {/* Category Grid OR Search Results */}
           <div style={{ padding:"16px 10px 40px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, alignItems:"start" }}>
