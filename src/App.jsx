@@ -799,17 +799,34 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
         <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:16,color:"#1a1a2e",marginBottom:12 }}>Categories</div>
         <div style={{ display:"flex",flexDirection:"column",gap:12,marginBottom:20 }}>
           {categories.map(cat=>(
-            <div key={cat.id} style={{ background:"#fff",borderRadius:18,padding:"14px 16px",display:"flex",alignItems:"center",gap:14,boxShadow:"0 3px 12px rgba(0,0,0,0.07)" }}>
-              <div style={{ width:52,height:52,borderRadius:12,overflow:"hidden",background:cat.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                {cat.photo ? <img src={cat.photo} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:28 }}>{cat.emoji}</span>}
+            <div key={cat.id} style={{ background:"#fff",borderRadius:18,padding:"14px 16px",boxShadow:"0 3px 12px rgba(0,0,0,0.07)" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:14,marginBottom:10 }}>
+                <div style={{ width:52,height:52,borderRadius:12,overflow:"hidden",background:cat.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                  {cat.photo ? <img src={cat.photo} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:28 }}>{cat.emoji}</span>}
+                </div>
+                <div style={{ flex:1,minWidth:0 }}>
+                  <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:15,color:"#1a1a2e",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{cat.label}</div>
+                  <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>{cat.items.length} items</div>
+                </div>
+                <div style={{ display:"flex",gap:8 }}>
+                  <button onClick={()=>setShowCatPhoto(cat.id)} style={{ background:cat.color,border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>📷</button>
+                  <button onClick={()=>handleDeleteCat(cat.id)} style={{ background:"#fee2e2",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#EF4444",fontWeight:700 }}>🗑️</button>
+                </div>
               </div>
-              <div style={{ flex:1,minWidth:0 }}>
-                <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:15,color:"#1a1a2e",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{cat.label}</div>
-                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>{cat.items.length} items</div>
-              </div>
-              <div style={{ display:"flex",gap:8 }}>
-                <button onClick={()=>setShowCatPhoto(cat.id)} style={{ background:cat.color,border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>📷</button>
-                <button onClick={()=>handleDeleteCat(cat.id)} style={{ background:"#fee2e2",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#EF4444",fontWeight:700 }}>🗑️</button>
+              {/* Phrase editor */}
+              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999",flexShrink:0 }}>Speaks:</div>
+                <input
+                  defaultValue={cat.phrase}
+                  onBlur={e => {
+                    const newPhrase = e.target.value.trim();
+                    if (newPhrase !== cat.phrase) {
+                      onUpdateCategories(categories.map(c => c.id===cat.id ? {...c, phrase:newPhrase} : c));
+                    }
+                  }}
+                  placeholder="Spoken phrase (e.g. I want)"
+                  style={{ flex:1,padding:"6px 10px",borderRadius:10,border:"1.5px solid #e0e0e0",fontSize:13,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:"none",color:"#1a1a2e" }}
+                />
               </div>
             </div>
           ))}
