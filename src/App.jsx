@@ -744,18 +744,25 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
   const CAT_EMOJIS = ["📌","🏠","🎯","🌟","💡","🎨","🎵","🏆","🍀","🔔","🎒","🌍","🧠","💪","🛡️","🔑"];
   const [selColor, setSelColor] = useState(CAT_COLORS[0]);
 
+  const [savingPhoto, setSavingPhoto] = useState(false);
+
   async function handleCatPhotoSave({ photo, emoji }) {
-    let photoUrl = null;
-    if (photo && photo.startsWith("data:")) {
-      // Upload photo to Firebase Storage
-      photoUrl = await handlePhotoUpload(photo, `categories/${showCatPhoto}/cover`);
-    } else if (photo && photo.startsWith("http")) {
-      // Already a URL
-      photoUrl = photo;
+    setSavingPhoto(true);
+    try {
+      let photoUrl = null;
+      if (photo && photo.startsWith("data:")) {
+        photoUrl = await handlePhotoUpload(photo, `categories/${showCatPhoto}/cover_${Date.now()}`);
+      } else if (photo && photo.startsWith("http")) {
+        photoUrl = photo;
+      }
+      onUpdateCategories(categories.map(c=>c.id===showCatPhoto ? { ...c, photo: photoUrl } : c));
+      setShowCatPhoto(null);
+    } catch(e) {
+      console.error("Category photo save error:", e);
+      alert("Photo save failed. Please try again.");
+    } finally {
+      setSavingPhoto(false);
     }
-    // Update category with new photo URL (or null if emoji was chosen — emoji shows as fallback)
-    onUpdateCategories(categories.map(c=>c.id===showCatPhoto ? { ...c, photo: photoUrl } : c));
-    setShowCatPhoto(null);
   }
 
   function handleDeleteCat(id) {
@@ -781,8 +788,8 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
   return (
     <div style={{ minHeight:"100vh",background:"#f5f7ff" }}>
       {showCatPhoto && (
-        <PhotoPickerModal title="Set Category Photo" color="#667eea"
-          onSave={handleCatPhotoSave} onClose={()=>setShowCatPhoto(null)} showNameField={false} />
+        <PhotoPickerModal title={savingPhoto ? "Saving..." : "Set Category Photo"} color="#667eea"
+          onSave={handleCatPhotoSave} onClose={()=>!savingPhoto && setShowCatPhoto(null)} showNameField={false} />
       )}
       <div style={{ background:"linear-gradient(135deg,#667eea,#764ba2)",padding:"16px 20px",display:"flex",alignItems:"center",gap:14 }}>
         <button onClick={onBack} style={{ background:"rgba(255,255,255,0.25)",border:"none",borderRadius:12,width:44,height:44,cursor:"pointer",fontSize:22,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>←</button>
@@ -1027,17 +1034,17 @@ export default function MyVoiceApp() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinAction, setPinAction] = useState(null);
   const [showOnMyWay, setShowOnMyWay] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
 
   useEffect(() => {
     const link = document.createElement("link");
     link.rel = "stylesheet"; link.href = FONT_LINK;
     document.head.appendChild(link);
-    // Load from Firestore on startup
     loadFromFirestore(SEED_DATA).then(d => {
       setData(d);
       setLoaded(true);
     });
-    // Listen for "On my way!" replies from parent
     const sub = subscribeToMessages(msg => {
       if (msg.message === "👍 On my way!") {
         setShowOnMyWay(true);
@@ -1047,6 +1054,21 @@ export default function MyVoiceApp() {
     });
     return () => sub?.unsubscribe?.();
   }, []);
+
+  // Global search across all categories
+  useEffect(() => {
+    if (!globalSearch.trim()) { setSearchResults([]); return; }
+    const q = globalSearch.toLowerCase();
+    const results = [];
+    data.categories.forEach(cat => {
+      cat.items?.forEach(item => {
+        if (item.name.toLowerCase().includes(q)) {
+          results.push({ item, category: cat });
+        }
+      });
+    });
+    setSearchResults(results);
+  }, [globalSearch, data.categories]);
 
   function persist(updated) { setData(updated); saveData(updated); }
   function updateCategory(c) { persist({ ...data, categories:data.categories.map(x=>x.id===c.id?c:x) }); }
@@ -1060,6 +1082,19 @@ export default function MyVoiceApp() {
   function handlePinSuccess() {
     setShowPinModal(false);
     if (pinAction==="unlock") setParentMode(true);
+  }
+
+  function handleSearchSpeak(item, category) {
+    const full = category.phrase ? `${category.phrase} ${item.name}` : item.name;
+    speak(full);
+    sendMessage(full);
+    fetch("/api/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: full }),
+    }).catch(e => console.error("Notify error:", e));
+    setGlobalSearch("");
+    setSearchResults([]);
   }
 
   return (
@@ -1077,11 +1112,102 @@ export default function MyVoiceApp() {
           onSuccess={handlePinSuccess} onClose={()=>setShowPinModal(false)} />
       )}
       {loaded && screen==="home" && (
-        <HomeScreen categories={data.categories} parentMode={parentMode}
-          onSelectCategory={cat=>{ setActiveCategory(cat); setScreen("category"); }}
-          onToggleParentMode={handleToggleParent}
-          onOpenSettings={()=>setScreen("settings")}
-          onOpenCompanion={()=>setScreen("companion")} />
+        <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#eef2ff 0%,#fafbff 100%)" }}>
+          {/* Header */}
+          <div style={{ background:"linear-gradient(135deg,#667eea 0%,#764ba2 100%)",padding:"24px 24px 16px",boxShadow:"0 4px 24px rgba(102,126,234,0.3)" }}>
+            <div style={{ display:"flex",alignItems:"flex-start",justifyContent:"space-between" }}>
+              <div>
+                <div style={{ fontSize:32,marginBottom:2 }}>🗣️</div>
+                <div style={{ color:"#fff",fontSize:26,fontWeight:900,fontFamily:"'Nunito',sans-serif",lineHeight:1.1 }}>My Voice</div>
+                <div style={{ color:"rgba(255,255,255,0.8)",fontSize:13,fontFamily:"'Nunito',sans-serif",marginTop:3 }}>
+                  {parentMode ? "✏️ Edit Mode" : "Tap a button to speak!"}
+                </div>
+              </div>
+              <div style={{ display:"flex",flexDirection:"column",gap:8,alignItems:"flex-end" }}>
+                <button onClick={handleToggleParent} style={{
+                  background:parentMode?"rgba(255,255,255,0.92)":"rgba(255,255,255,0.22)",
+                  border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",
+                  fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,
+                  color:parentMode?"#667eea":"#fff",
+                }}>
+                  {parentMode ? "🔓 Exit Edit" : "🔐 Edit"}
+                </button>
+                {parentMode && (
+                  <button onClick={()=>setScreen("settings")} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
+                    ⚙️ Settings
+                  </button>
+                )}
+                <button onClick={()=>setScreen("companion")} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
+                  📱 Parent View
+                </button>
+              </div>
+            </div>
+
+            {/* Global Search Bar */}
+            <div style={{ marginTop:14, position:"relative" }}>
+              <input
+                value={globalSearch}
+                onChange={e=>setGlobalSearch(e.target.value)}
+                placeholder="🔍 Search everything..."
+                style={{
+                  width:"100%", padding:"12px 16px", borderRadius:18,
+                  border:"none", fontSize:16, fontFamily:"'Nunito',sans-serif",
+                  fontWeight:600, outline:"none", background:"rgba(255,255,255,0.95)",
+                  boxSizing:"border-box", boxShadow:"0 2px 12px rgba(0,0,0,0.15)",
+                }}
+              />
+              {globalSearch && (
+                <button onClick={()=>{ setGlobalSearch(""); setSearchResults([]); }} style={{
+                  position:"absolute", right:12, top:"50%", transform:"translateY(-50%)",
+                  background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#999",
+                }}>✕</button>
+              )}
+            </div>
+          </div>
+
+          {/* Search Results */}
+          {searchResults.length > 0 && (
+            <div style={{ padding:"12px 16px", background:"#fff", borderBottom:"1px solid #eee" }}>
+              <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#999",marginBottom:10 }}>
+                {searchResults.length} result{searchResults.length!==1?"s":""}
+              </div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                {searchResults.map(({item, category}) => (
+                  <button key={item.id} onClick={()=>handleSearchSpeak(item, category)} style={{
+                    display:"flex", alignItems:"center", gap:8,
+                    background:category.color+"22", border:`2px solid ${category.color}44`,
+                    borderRadius:16, padding:"10px 16px", cursor:"pointer",
+                    fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14,
+                    color:"#1a1a2e",
+                  }}>
+                    {item.photo
+                      ? <img src={item.photo} alt="" style={{ width:28,height:28,borderRadius:8,objectFit:"cover" }} />
+                      : <span style={{ fontSize:20 }}>{item.emoji}</span>
+                    }
+                    <div style={{ textAlign:"left" }}>
+                      <div>{item.name}</div>
+                      <div style={{ fontSize:11,color:"#999",fontWeight:600 }}>{category.label}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No results */}
+          {globalSearch && searchResults.length === 0 && (
+            <div style={{ padding:"16px 20px", textAlign:"center", color:"#aaa", fontFamily:"'Nunito',sans-serif", fontSize:14 }}>
+              No results for "{globalSearch}"
+            </div>
+          )}
+
+          {/* Category Grid */}
+          <div style={{ padding:"16px 10px 40px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, alignItems:"start" }}>
+            {data.categories.map((cat,i) => (
+              <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode} onClick={()=>{ setActiveCategory(cat); setScreen("category"); }} />
+            ))}
+          </div>
+        </div>
       )}
       {screen==="category" && activeCategory && (
         <CategoryScreen
