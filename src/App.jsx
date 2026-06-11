@@ -725,9 +725,13 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
   const CAT_EMOJIS = ["📌","🏠","🎯","🌟","💡","🎨","🎵","🏆","🍀","🔔","🎒","🌍","🧠","💪","🛡️","🔑"];
   const [selColor, setSelColor] = useState(CAT_COLORS[0]);
 
-  function handleCatPhotoSave({ photo }) {
+  async function handleCatPhotoSave({ photo }) {
     if (!photo) return;
-    onUpdateCategories(categories.map(c=>c.id===showCatPhoto?{...c,photo}:c));
+    let photoUrl = photo;
+    if (photo && !photo.startsWith("http")) {
+      photoUrl = await handlePhotoUpload(photo, `categories/${showCatPhoto}/cover`);
+    }
+    onUpdateCategories(categories.map(c=>c.id===showCatPhoto?{...c,photo:photoUrl}:c));
     setShowCatPhoto(null);
   }
 
