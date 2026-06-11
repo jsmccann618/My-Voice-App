@@ -192,7 +192,7 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const DEEP_LINKS = {
     "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
     "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
-    "amazon music":  { app: "amzn://music", web: "https://music.amazon.com/library/albums" },
+    "amazon music":  { app: "com.amazon.mp3://", web: "https://music.amazon.com/library/albums" },
     "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
     "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
     "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
@@ -213,10 +213,27 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
     const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
 
     if (deepLink) {
-      window.location = deepLink.app;
-      setTimeout(() => {
-        window.open(deepLink.web, "_blank");
-      }, 2000);
+      // Try app first, silently fall back to web after timeout
+      const appUrl = deepLink.app;
+      const webUrl = deepLink.web;
+      
+      if (appUrl && !appUrl.startsWith("http")) {
+        // Custom URL scheme — try to open app
+        const iframe = document.createElement("iframe");
+        iframe.style.cssText = "display:none;width:0;height:0;border:none;";
+        iframe.src = appUrl;
+        document.body.appendChild(iframe);
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch(e) {}
+        }, 500);
+        // Fall back to web after delay if app didn't open
+        setTimeout(() => {
+          if (!document.hidden) window.open(webUrl, "_blank");
+        }, 1500);
+      } else {
+        // Regular URL — open directly
+        window.open(webUrl, "_blank");
+      }
     }
   }
 
