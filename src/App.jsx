@@ -1165,47 +1165,44 @@ export default function MyVoiceApp() {
             </div>
           </div>
 
-          {/* Search Results */}
-          {searchResults.length > 0 && (
-            <div style={{ padding:"12px 16px", background:"#fff", borderBottom:"1px solid #eee" }}>
-              <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#999",marginBottom:10 }}>
-                {searchResults.length} result{searchResults.length!==1?"s":""}
-              </div>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-                {searchResults.map(({item, category}) => (
-                  <button key={item.id} onClick={()=>handleSearchSpeak(item, category)} style={{
-                    display:"flex", alignItems:"center", gap:8,
-                    background:category.color+"22", border:`2px solid ${category.color}44`,
-                    borderRadius:16, padding:"10px 16px", cursor:"pointer",
-                    fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14,
-                    color:"#1a1a2e",
-                  }}>
-                    {item.photo
-                      ? <img src={item.photo} alt="" style={{ width:28,height:28,borderRadius:8,objectFit:"cover" }} />
-                      : <span style={{ fontSize:20 }}>{item.emoji}</span>
-                    }
-                    <div style={{ textAlign:"left" }}>
-                      <div>{item.name}</div>
-                      <div style={{ fontSize:11,color:"#999",fontWeight:600 }}>{category.label}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* No results */}
-          {globalSearch && searchResults.length === 0 && (
-            <div style={{ padding:"16px 20px", textAlign:"center", color:"#aaa", fontFamily:"'Nunito',sans-serif", fontSize:14 }}>
-              No results for "{globalSearch}"
-            </div>
-          )}
-
-          {/* Category Grid */}
+          {/* Category Grid OR Search Results */}
           <div style={{ padding:"16px 10px 40px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, alignItems:"start" }}>
-            {data.categories.map((cat,i) => (
-              <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode} onClick={()=>{ setActiveCategory(cat); setScreen("category"); }} />
-            ))}
+            {globalSearch ? (
+              searchResults.length > 0 ? searchResults.map(({item, category}) => (
+                <div key={item.id} style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
+                  <BlobCard
+                    item={item}
+                    phrase={category.phrase}
+                    color={category.color}
+                    dark={category.dark}
+                    light={category.light}
+                    index={0}
+                    onSpeak={(text) => {
+                      sendMessage(text);
+                      fetch("/api/notify", {
+                        method:"POST",
+                        headers:{"Content-Type":"application/json"},
+                        body:JSON.stringify({ message: text }),
+                      }).catch(e=>console.error(e));
+                      setGlobalSearch("");
+                      setSearchResults([]);
+                    }}
+                    onEdit={()=>{}}
+                    onDelete={()=>{}}
+                    parentMode={false}
+                  />
+                  <div style={{ fontSize:10, color:"#aaa", fontFamily:"'Nunito',sans-serif", marginTop:2 }}>{category.label}</div>
+                </div>
+              )) : (
+                <div style={{ gridColumn:"1/-1", textAlign:"center", padding:40, color:"#aaa", fontFamily:"'Nunito',sans-serif", fontSize:15 }}>
+                  No results for "{globalSearch}"
+                </div>
+              )
+            ) : (
+              data.categories.map((cat,i) => (
+                <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode} onClick={()=>{ setActiveCategory(cat); setScreen("category"); }} />
+              ))
+            )}
           </div>
         </div>
       )}
