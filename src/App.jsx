@@ -99,7 +99,7 @@ const SEED_CATEGORIES = [
       {
         id:"l1", name:"Amazon Music", emoji:"🎵", photo:null,
         logo:"https://m.media-amazon.com/images/G/01/digital/music/player/web/GM-image-US-en.png",
-        appLink:"https://music.amazon.com/library/albums",
+        appLink:null,
         webLink:"https://music.amazon.com/library/albums",
       },
     ],
@@ -192,7 +192,7 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const DEEP_LINKS = {
     "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
     "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
-    "amazon music":  { app: "https://music.amazon.com/library/albums", web: "https://music.amazon.com/library/albums" },
+    "amazon music":  { app: "amzn://music", web: "https://music.amazon.com/library/albums" },
     "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
     "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
     "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
