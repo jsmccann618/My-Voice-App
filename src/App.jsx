@@ -213,15 +213,11 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
     const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
 
     if (deepLink) {
-      const url = deepLink.app || deepLink.web;
-      // Create a real link and click it — iOS handles universal links better this way
-      const a = document.createElement("a");
-      a.href = url;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { try { document.body.removeChild(a); } catch(e) {} }, 500);
+      const start = Date.now();
+      window.location = deepLink.app;
+      setTimeout(() => {
+        if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
+      }, 1500);
     }
   }
 
