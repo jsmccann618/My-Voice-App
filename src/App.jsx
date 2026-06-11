@@ -1291,7 +1291,6 @@ export default function MyVoiceApp() {
               data.categories.map((cat,i) => (
                 <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode}
                   onClick={()=>{ setActiveCategory(cat); setScreen("category"); }}
-                  onEdit={setEditCat}
                 />
               ))
             )}
