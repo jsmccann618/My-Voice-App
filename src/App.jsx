@@ -612,18 +612,27 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
   async function handleSaveItem({ name, emoji, photo }) {
     const id = `c_${Date.now()}`;
     let photoUrl = null;
-    if (photo) {
+    if (photo && photo.startsWith("data:")) {
+      // It's a base64 image — upload to Firebase Storage
       photoUrl = await handlePhotoUpload(photo, `items/${category.id}/${id}`);
+    } else if (photo && photo.startsWith("http")) {
+      // Already a URL — use as is
+      photoUrl = photo;
     }
+    // If no photo, just use emoji (photoUrl stays null)
     persist([...items, { id, name, emoji, photo: photoUrl }]);
   }
 
   async function handleEditItem({ name, emoji, photo }) {
     let photoUrl = photo;
-    if (photo && !photo.startsWith("http")) {
+    if (photo && photo.startsWith("data:")) {
+      // New base64 image — upload to Firebase Storage
       photoUrl = await handlePhotoUpload(photo, `items/${category.id}/${editItem.id}`);
+    } else if (!photo) {
+      // No photo selected — keep existing
+      photoUrl = editItem.photo;
     }
-    persist(items.map(i => i.id===editItem.id ? { ...i, name, emoji, photo:photoUrl??i.photo } : i));
+    persist(items.map(i => i.id===editItem.id ? { ...i, name, emoji, photo:photoUrl } : i));
     setEditItem(null);
   }
 
