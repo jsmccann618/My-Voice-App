@@ -399,6 +399,7 @@ function HomeBlobCard({ cat, onClick, parentMode, index, onEdit }) {
 // ─── Edit Category Modal ──────────────────────────────────────────────────────
 function EditCategoryModal({ cat, onSave, onClose }) {
   const [name, setName] = useState(cat.label);
+  const [phrase, setPhrase] = useState(cat.phrase);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -410,7 +411,7 @@ function EditCategoryModal({ cat, onSave, onClose }) {
     } else if (photo && photo.startsWith("http")) {
       photoUrl = photo;
     }
-    onSave({ ...cat, label: name.trim(), photo: photoUrl });
+    onSave({ ...cat, label: name.trim(), phrase: phrase.trim(), photo: photoUrl });
     setSaving(false);
     setShowPhotoPicker(false);
     onClose();
@@ -418,7 +419,7 @@ function EditCategoryModal({ cat, onSave, onClose }) {
 
   function handleSaveNameOnly() {
     if (!name.trim()) return;
-    onSave({ ...cat, label: name.trim() });
+    onSave({ ...cat, label: name.trim(), phrase: phrase.trim() });
     onClose();
   }
 
@@ -440,9 +441,16 @@ function EditCategoryModal({ cat, onSave, onClose }) {
           </div>
           <div style={{ padding:20 }}>
             {/* Name */}
-            <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:13,color:"#666",marginBottom:8 }}>Category Name</div>
+            <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:13,color:"#666",marginBottom:6 }}>Button Label</div>
             <input value={name} onChange={e=>setName(e.target.value)}
-              placeholder="Category name"
+              placeholder="e.g. I Want to Eat"
+              style={{ width:"100%",padding:"12px 16px",borderRadius:14,border:"2px solid #e0e0e0",fontSize:16,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:"none",boxSizing:"border-box",marginBottom:14 }} />
+
+            {/* Phrase */}
+            <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:13,color:"#666",marginBottom:6 }}>Spoken Phrase</div>
+            <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:11,color:"#aaa",marginBottom:6 }}>What it says before the item name (e.g. "I want to eat" → "I want to eat Pizza")</div>
+            <input value={phrase} onChange={e=>setPhrase(e.target.value)}
+              placeholder="e.g. I want to eat"
               style={{ width:"100%",padding:"12px 16px",borderRadius:14,border:"2px solid #e0e0e0",fontSize:16,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:"none",boxSizing:"border-box",marginBottom:16 }} />
 
             {/* Change image button */}
@@ -454,12 +462,12 @@ function EditCategoryModal({ cat, onSave, onClose }) {
               📷 Change Image
             </button>
 
-            {/* Save name button */}
+            {/* Save button */}
             <button onClick={handleSaveNameOnly} disabled={!name.trim()} style={{
               width:"100%",padding:14,borderRadius:14,border:"none",
               background:name.trim()?cat.color:"#ccc",color:"#fff",fontSize:17,fontWeight:800,
               fontFamily:"'Nunito',sans-serif",cursor:name.trim()?"pointer":"not-allowed",
-            }}>✅ Save Name</button>
+            }}>✅ Save</button>
           </div>
         </div>
       )}
