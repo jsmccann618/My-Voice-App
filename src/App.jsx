@@ -1114,6 +1114,143 @@ function ParentCompanionScreen({ onBack }) {
   );
 }
 
+// ─── Choice Board (temporary, no persistence) ─────────────────────────────────
+function ChoiceBoardScreen({ onBack }) {
+  const [phase, setPhase] = useState("count"); // count | capture | choose | result
+  const [count, setCount] = useState(0);
+  const [photos, setPhotos] = useState([]);
+  const [current, setCurrent] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [confetti, setConfetti] = useState(false);
+
+  function handleCountSelect(n) {
+    setCount(n);
+    setPhotos([]);
+    setCurrent(0);
+    setPhase("capture");
+  }
+
+  function handlePhotoSave({ photo, emoji }) {
+    const newPhotos = [...photos, { photo, emoji }];
+    setPhotos(newPhotos);
+    if (newPhotos.length >= count) {
+      setPhase("choose");
+    } else {
+      setCurrent(current + 1);
+    }
+  }
+
+  function handleChoose(idx) {
+    setSelected(idx);
+    setConfetti(true);
+    setPhase("result");
+    setTimeout(() => setConfetti(false), 2000);
+  }
+
+  function handleReset() {
+    setPhase("count");
+    setCount(0);
+    setPhotos([]);
+    setCurrent(0);
+    setSelected(null);
+  }
+
+  return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#fef3ff 0%,#fafbff 100%)" }}>
+      <Confetti show={confetti} />
+      {/* Header */}
+      <div style={{ background:"linear-gradient(135deg,#A855F7,#7C3AED)", padding:"16px 20px", display:"flex", alignItems:"center", gap:14, boxShadow:"0 4px 20px rgba(0,0,0,0.12)" }}>
+        <button onClick={onBack} style={{ background:"rgba(255,255,255,0.25)",border:"none",borderRadius:12,width:44,height:44,cursor:"pointer",fontSize:22,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>←</button>
+        <div style={{ color:"#fff", fontSize:19, fontWeight:800, fontFamily:"'Nunito',sans-serif" }}>🎯 Choice Board</div>
+      </div>
+
+      <div style={{ padding:24 }}>
+        {/* Step 1: Pick number of options */}
+        {phase === "count" && (
+          <div>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, color:"#1a1a2e", marginBottom:16, textAlign:"center" }}>
+              How many options?
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
+              {[2,3,4,5,6].map(n => (
+                <button key={n} onClick={()=>handleCountSelect(n)} style={{
+                  padding:"24px 0", borderRadius:18, border:"none",
+                  background:"linear-gradient(135deg,#A855F7,#7C3AED)",
+                  color:"#fff", fontSize:28, fontWeight:900,
+                  fontFamily:"'Nunito',sans-serif", cursor:"pointer",
+                  boxShadow:"0 4px 14px rgba(124,58,237,0.3)",
+                }}>{n}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Capture photos one at a time */}
+        {phase === "capture" && (
+          <PhotoPickerModal
+            title={`Option ${current+1} of ${count}`}
+            color="#A855F7"
+            onSave={handlePhotoSave}
+            onClose={onBack}
+            showNameField={false}
+          />
+        )}
+
+        {/* Step 3: Choose */}
+        {phase === "choose" && (
+          <div>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:18, color:"#1a1a2e", marginBottom:16, textAlign:"center" }}>
+              Tap your choice!
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns: count<=2 ? "1fr 1fr" : count<=4 ? "1fr 1fr" : "1fr 1fr 1fr", gap:14 }}>
+              {photos.map((p, idx) => (
+                <button key={idx} onClick={()=>handleChoose(idx)} style={{
+                  border:"none", borderRadius:20, padding:0, cursor:"pointer",
+                  background:"#fff", boxShadow:"0 6px 18px rgba(0,0,0,0.12)",
+                  overflow:"hidden", aspectRatio:"1", display:"flex",
+                  alignItems:"center", justifyContent:"center",
+                }}>
+                  {p.photo
+                    ? <img src={p.photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                    : <span style={{ fontSize:60 }}>{p.emoji}</span>
+                  }
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Result — show only chosen one */}
+        {phase === "result" && selected !== null && (
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginTop:20 }}>
+            <div style={{
+              borderRadius:28, overflow:"hidden", boxShadow:"0 12px 36px rgba(124,58,237,0.35)",
+              border:"6px solid #A855F7", width:"100%", maxWidth:300, aspectRatio:"1",
+              display:"flex", alignItems:"center", justifyContent:"center", background:"#fff",
+            }}>
+              {photos[selected].photo
+                ? <img src={photos[selected].photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                : <span style={{ fontSize:120 }}>{photos[selected].emoji}</span>
+              }
+            </div>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:24, color:"#7C3AED", marginTop:20 }}>
+              Great choice! 🎉
+            </div>
+            <button onClick={handleReset} style={{
+              marginTop:24, padding:"14px 32px", borderRadius:16, border:"none",
+              background:"linear-gradient(135deg,#A855F7,#7C3AED)", color:"#fff",
+              fontSize:17, fontWeight:800, fontFamily:"'Nunito',sans-serif", cursor:"pointer",
+              boxShadow:"0 4px 14px rgba(124,58,237,0.3)",
+            }}>
+              🔄 New Choice
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function MyVoiceApp() {
   const [data, setData] = useState(SEED_DATA);
@@ -1230,6 +1367,9 @@ export default function MyVoiceApp() {
                 <button onClick={()=>setScreen("companion")} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
                   📱 Parent View
                 </button>
+                <button onClick={()=>setScreen("choice")} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
+                  🎯 Choice Board
+                </button>
               </div>
             </div>
 
@@ -1307,6 +1447,9 @@ export default function MyVoiceApp() {
       )}
       {loaded && screen==="companion" && (
         <ParentCompanionScreen onBack={()=>setScreen("home")} />
+      )}
+      {loaded && screen==="choice" && (
+        <ChoiceBoardScreen onBack={()=>setScreen("home")} />
       )}
       {loaded && screen==="settings" && (
         <SettingsScreen categories={data.categories} currentPin={data.parentPin}
