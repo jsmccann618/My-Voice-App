@@ -1188,6 +1188,7 @@ function ChoiceBoardScreen({ onBack }) {
         {/* Step 2: Capture photos one at a time */}
         {phase === "capture" && (
           <PhotoPickerModal
+            key={current}
             title={`Option ${current+1} of ${count}`}
             color="#A855F7"
             onSave={handlePhotoSave}
@@ -1364,9 +1365,6 @@ export default function MyVoiceApp() {
                     ⚙️ Settings
                   </button>
                 )}
-                <button onClick={()=>setScreen("companion")} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
-                  📱 Parent View
-                </button>
                 <button onClick={()=>setScreen("choice")} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
                   🎯 Choice Board
                 </button>
@@ -1444,9 +1442,6 @@ export default function MyVoiceApp() {
           parentMode={parentMode}
           onBack={()=>setScreen("home")}
           onUpdateCategory={updateCategory} />
-      )}
-      {loaded && screen==="companion" && (
-        <ParentCompanionScreen onBack={()=>setScreen("home")} />
       )}
       {loaded && screen==="choice" && (
         <ChoiceBoardScreen onBack={()=>setScreen("home")} />
