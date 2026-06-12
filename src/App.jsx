@@ -1245,6 +1245,13 @@ function ChoiceBoardScreen({ onBack }) {
             }}>
               🔄 New Choice
             </button>
+            <button onClick={onBack} style={{
+              marginTop:12, padding:"14px 32px", borderRadius:16, border:`2px solid #A855F7`,
+              background:"transparent", color:"#7C3AED",
+              fontSize:17, fontWeight:800, fontFamily:"'Nunito',sans-serif", cursor:"pointer",
+            }}>
+              🏠 Home
+            </button>
           </div>
         )}
       </div>
