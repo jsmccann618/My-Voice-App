@@ -532,7 +532,7 @@ const EMOJIS = ["🍕","🍔","🌮","🍦","🍎","🧃","🏠","🌳","🚗","
   "🌈","⭐","❤️","🎉","🌟","✅","❌","🙏","✋","➕","🤷","🤔","🔑","🧸","🎁",
   "🍗","🧀","🥪","🥦","🍟","🧁","🍩","🥤","☀️","🌙","⚡","🔥","💧","🌊"];
 
-function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, initialName="" }) {
+function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, initialName="", nameOptional=false }) {
   const cam = useCamera();
   const [photo, setPhoto] = useState(null);
   const [name, setName] = useState(initialName);
@@ -562,13 +562,13 @@ function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, i
   }
 
   function handleSave() {
-    if (showNameField && !name.trim()) return;
+    if (showNameField && !nameOptional && !name.trim()) return;
     // On emoji tab, explicitly pass null for photo so emoji shows
     const photoToSave = tab === "emoji" ? null : photo;
     onSave({ name:name.trim(), emoji, photo:photoToSave });
   }
 
-  const canSave = showNameField ? !!name.trim() : true;
+  const canSave = (showNameField && !nameOptional) ? !!name.trim() : true;
 
   return (
     <div style={{ position:"fixed",inset:0,zIndex:150,background:"rgba(0,0,0,0.62)",display:"flex",alignItems:"center",justifyContent:"center",padding:16 }}>
@@ -626,7 +626,8 @@ function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, i
             </div>
           )}
           {showNameField && (
-            <input value={name} onChange={e=>setName(e.target.value)} placeholder="Name this item (e.g. McDonald's)"
+            <input value={name} onChange={e=>setName(e.target.value)}
+              placeholder={nameOptional ? "Optional: name this (e.g. Red Shirt)" : "Name this item (e.g. McDonald's)"}
               style={{ width:"100%",padding:"12px 16px",borderRadius:14,border:"2px solid #e0e0e0",fontSize:16,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:"none",boxSizing:"border-box",marginBottom:14 }} />
           )}
           <button onClick={handleSave} disabled={!canSave} style={{
@@ -1130,8 +1131,8 @@ function ChoiceBoardScreen({ onBack }) {
     setPhase("capture");
   }
 
-  function handlePhotoSave({ photo, emoji }) {
-    const newPhotos = [...photos, { photo, emoji }];
+  function handlePhotoSave({ photo, emoji, name }) {
+    const newPhotos = [...photos, { photo, emoji, name: name?.trim() || "" }];
     setPhotos(newPhotos);
     if (newPhotos.length >= count) {
       setPhase("choose");
@@ -1145,6 +1146,7 @@ function ChoiceBoardScreen({ onBack }) {
     setConfetti(true);
     setPhase("result");
     setTimeout(() => setConfetti(false), 2000);
+    if (photos[idx].name) speak(photos[idx].name);
   }
 
   function handleReset() {
@@ -1193,7 +1195,8 @@ function ChoiceBoardScreen({ onBack }) {
             color="#A855F7"
             onSave={handlePhotoSave}
             onClose={onBack}
-            showNameField={false}
+            showNameField={true}
+            nameOptional={true}
           />
         )}
 
@@ -1205,17 +1208,22 @@ function ChoiceBoardScreen({ onBack }) {
             </div>
             <div style={{ display:"grid", gridTemplateColumns: count<=2 ? "1fr 1fr" : count<=4 ? "1fr 1fr" : "1fr 1fr 1fr", gap:14 }}>
               {photos.map((p, idx) => (
-                <button key={idx} onClick={()=>handleChoose(idx)} style={{
-                  border:"none", borderRadius:20, padding:0, cursor:"pointer",
-                  background:"#fff", boxShadow:"0 6px 18px rgba(0,0,0,0.12)",
-                  overflow:"hidden", aspectRatio:"1", display:"flex",
-                  alignItems:"center", justifyContent:"center",
-                }}>
-                  {p.photo
-                    ? <img src={p.photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                    : <span style={{ fontSize:60 }}>{p.emoji}</span>
-                  }
-                </button>
+                <div key={idx} style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
+                  {p.name && (
+                    <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:14, color:"#7C3AED", marginBottom:6, textAlign:"center" }}>{p.name}</div>
+                  )}
+                  <button onClick={()=>handleChoose(idx)} style={{
+                    border:"none", borderRadius:20, padding:0, cursor:"pointer",
+                    background:"#fff", boxShadow:"0 6px 18px rgba(0,0,0,0.12)",
+                    overflow:"hidden", aspectRatio:"1", display:"flex",
+                    alignItems:"center", justifyContent:"center", width:"100%",
+                  }}>
+                    {p.photo
+                      ? <img src={p.photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      : <span style={{ fontSize:60 }}>{p.emoji}</span>
+                    }
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -1234,7 +1242,12 @@ function ChoiceBoardScreen({ onBack }) {
                 : <span style={{ fontSize:120 }}>{photos[selected].emoji}</span>
               }
             </div>
-            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:24, color:"#7C3AED", marginTop:20 }}>
+            {photos[selected].name && (
+              <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:22, color:"#1a1a2e", marginTop:14 }}>
+                {photos[selected].name}
+              </div>
+            )}
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:24, color:"#7C3AED", marginTop:10 }}>
               Great choice! 🎉
             </div>
             <button onClick={handleReset} style={{
