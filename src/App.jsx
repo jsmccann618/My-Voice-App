@@ -183,10 +183,11 @@ const BLOB_PATHS = [
 ];
 
 // ─── Blob Card (item button) ──────────────────────────────────────────────────
-function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, onDelete, parentMode }) {
+function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, onDelete, parentMode, onOpenMenu, onManageMenu }) {
   const [squish, setSquish] = useState(false);
   const blobPath = BLOB_PATHS[index % BLOB_PATHS.length];
   const uid = `bc_${item.id}`;
+  const hasMenu = item.subMenu?.food?.length > 0;
 
   // Auto deep link map — if item name matches, open the app
   const DEEP_LINKS = {
@@ -204,6 +205,13 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
     if (parentMode) return;
     setSquish(true);
     setTimeout(() => setSquish(false), 300);
+
+    // If this item has a restaurant sub-menu, open the menu flow instead of speaking
+    if (hasMenu) {
+      onOpenMenu(item);
+      return;
+    }
+
     const full = phrase ? `${phrase} ${item.name}` : item.name;
     speak(full);
     onSpeak(full);
@@ -286,9 +294,18 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
         }}>Opens App ↗</span>
       )}
 
+      {hasMenu && !parentMode && (
+        <span style={{
+          fontSize:10, fontWeight:700, color:color,
+          fontFamily:"'Nunito',sans-serif", marginTop:2,
+          background: light, borderRadius:8, padding:"2px 8px",
+        }}>🍽️ Menu</span>
+      )}
+
       {parentMode && (
         <div style={{ display:"flex", gap:5, marginTop:5 }}>
           <button onClick={()=>onEdit(item)} style={{ background:color,border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>✏️</button>
+          <button onClick={()=>onManageMenu(item)} style={{ background:"#10B981",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>🍽️</button>
           <button onClick={()=>onDelete(item.id)} style={{ background:"#EF4444",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>🗑️</button>
         </div>
       )}
@@ -683,6 +700,175 @@ function PinModal({ title, onSuccess, onClose, correctPin }) {
 }
 
 // ─── Category Screen ──────────────────────────────────────────────────────────
+// ─── Restaurant Order Screen (Logan's flow: food → drink → speak) ────────────
+function RestaurantOrderScreen({ item, color, dark, light, onBack, onComplete }) {
+  const [step, setStep] = useState("food"); // food | drink
+  const [selectedFood, setSelectedFood] = useState(null);
+  const foodOptions = item.subMenu?.food || [];
+  const drinkOptions = item.subMenu?.drink || [];
+
+  function finish(food, drink) {
+    const phrase = `I want ${item.name} ${food.name}${drink ? ` and ${drink.name}` : ""}`;
+    onComplete(phrase);
+  }
+
+  function handleSelect(opt) {
+    if (step === "food") {
+      if (drinkOptions.length > 0) {
+        setSelectedFood(opt);
+        setStep("drink");
+      } else {
+        finish(opt, null);
+      }
+    } else {
+      finish(selectedFood, opt);
+    }
+  }
+
+  const options = step === "food" ? foodOptions : drinkOptions;
+  const title = step === "food" ? `What from ${item.name}?` : `What drink?`;
+
+  return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#eef2ff 0%,#fafbff 100%)", display:"flex", flexDirection:"column" }}>
+      <div style={{ background:color, padding:"16px 20px", display:"flex", alignItems:"center", gap:14, boxShadow:"0 4px 20px rgba(0,0,0,0.12)" }}>
+        <button onClick={onBack} style={{ background:"rgba(255,255,255,0.25)",border:"none",borderRadius:12,width:44,height:44,cursor:"pointer",fontSize:22,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>←</button>
+        <div style={{ color:"#fff",fontSize:19,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>{title}</div>
+      </div>
+      {step === "drink" && selectedFood && (
+        <div style={{ padding:"12px 20px 0", fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14, color:"#999" }}>
+          ✅ {selectedFood.name}
+        </div>
+      )}
+      <div style={{ flex:1, padding:"16px 12px 40px", display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))", gap:12, alignContent:"start" }}>
+        {options.map((opt, i) => {
+          const blobPath = BLOB_PATHS[i % BLOB_PATHS.length];
+          const uid = `ro_${opt.id}`;
+          return (
+            <button key={opt.id} onClick={()=>handleSelect(opt)} style={{
+              background:"none", border:"none", cursor:"pointer", padding:0,
+              display:"flex", flexDirection:"column", alignItems:"center",
+              filter:`drop-shadow(0 5px 10px ${dark}55)`,
+            }}>
+              <svg viewBox="0 0 100 100" style={{ width:140, height:140, display:"block", overflow:"visible" }}>
+                <defs>
+                  <radialGradient id={`${uid}_g`} cx="38%" cy="30%" r="65%">
+                    <stop offset="0%" stopColor={light} />
+                    <stop offset="50%" stopColor={color} />
+                    <stop offset="100%" stopColor={dark} />
+                  </radialGradient>
+                  <clipPath id={`${uid}_c`}><path d={blobPath} /></clipPath>
+                </defs>
+                <path d={blobPath} fill={`url(#${uid}_g)`} />
+                {opt.photo ? (
+                  <image href={opt.photo} x="8" y="8" width="84" height="84"
+                    clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid slice" opacity="0.9" />
+                ) : (
+                  <text x="50" y="55" textAnchor="middle" dominantBaseline="middle" fontSize="38">{opt.emoji}</text>
+                )}
+                <ellipse cx="36" cy="26" rx="14" ry="9" fill="white" opacity="0.28" transform="rotate(-20,36,26)" />
+              </svg>
+              <span style={{ fontSize:14, fontWeight:800, color:"#1e1e1e", fontFamily:"'Nunito',sans-serif", marginTop:4, textAlign:"center" }}>{opt.name}</span>
+            </button>
+          );
+        })}
+        {options.length === 0 && (
+          <div style={{ gridColumn:"1/-1", textAlign:"center", padding:30, color:"#aaa", fontFamily:"'Nunito',sans-serif" }}>
+            No options yet — add some in Edit Mode!
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Sub-Menu Edit Screen (parent manages food/drink options) ────────────────
+function SubMenuEditScreen({ item, color, onBack, onSave }) {
+  const [food, setFood] = useState(item.subMenu?.food || []);
+  const [drink, setDrink] = useState(item.subMenu?.drink || []);
+  const [adding, setAdding] = useState(null); // "food" | "drink" | null
+  const [saving, setSaving] = useState(false);
+
+  async function handleAddSave({ name, emoji, photo }) {
+    if (!name.trim()) return;
+    setSaving(true);
+    let photoUrl = null;
+    if (photo && photo.startsWith("data:")) {
+      photoUrl = await handlePhotoUpload(photo, `submenu/${item.id}/${adding}/${Date.now()}`);
+    } else if (photo) {
+      photoUrl = photo;
+    }
+    const newOption = { id:`sm_${Date.now()}`, name:name.trim(), emoji, photo:photoUrl };
+    if (adding === "food") setFood(f=>[...f, newOption]);
+    else setDrink(d=>[...d, newOption]);
+    setSaving(false);
+    setAdding(null);
+  }
+
+  function handleDelete(type, id) {
+    if (type==="food") setFood(food.filter(f=>f.id!==id));
+    else setDrink(drink.filter(d=>d.id!==id));
+  }
+
+  function handleDone() {
+    onSave({ ...item, subMenu: { food, drink } });
+  }
+
+  function renderList(list, type) {
+    return (
+      <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginBottom:12 }}>
+        {list.map(opt => (
+          <div key={opt.id} style={{ display:"flex", flexDirection:"column", alignItems:"center", width:90 }}>
+            <div style={{ width:80, height:80, borderRadius:16, overflow:"hidden", background:"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 3px 10px rgba(0,0,0,0.1)" }}>
+              {opt.photo ? <img src={opt.photo} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:36 }}>{opt.emoji}</span>}
+            </div>
+            <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:12, color:"#1a1a2e", marginTop:4, textAlign:"center" }}>{opt.name}</div>
+            <button onClick={()=>handleDelete(type, opt.id)} style={{ marginTop:4, background:"#fee2e2", border:"none", borderRadius:8, padding:"3px 10px", cursor:"pointer", fontSize:11, color:"#EF4444", fontWeight:700 }}>🗑️ Remove</button>
+          </div>
+        ))}
+        <button onClick={()=>setAdding(type)} style={{
+          width:80, height:80, borderRadius:16, border:`2px dashed ${color}`,
+          background:"transparent", cursor:"pointer", display:"flex",
+          alignItems:"center", justifyContent:"center", fontSize:28, color:color,
+          flexShrink:0,
+        }}>+</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#eef2ff 0%,#fafbff 100%)" }}>
+      {adding && (
+        <PhotoPickerModal title={saving ? "Saving..." : `Add ${adding==="food"?"Food":"Drink"} Option`} color={color}
+          onSave={handleAddSave} onClose={()=>!saving && setAdding(null)} showNameField={true} />
+      )}
+      <div style={{ background:color, padding:"16px 20px", display:"flex", alignItems:"center", gap:14, boxShadow:"0 4px 20px rgba(0,0,0,0.12)" }}>
+        <button onClick={handleDone} style={{ background:"rgba(255,255,255,0.25)",border:"none",borderRadius:12,width:44,height:44,cursor:"pointer",fontSize:22,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>←</button>
+        <div style={{ color:"#fff",fontSize:18,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>🍽️ Menu: {item.name}</div>
+      </div>
+      <div style={{ padding:20 }}>
+        <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, color:"#1a1a2e", marginBottom:8 }}>🍔 Food Options</div>
+        {renderList(food, "food")}
+
+        <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, color:"#1a1a2e", marginBottom:8, marginTop:16 }}>🥤 Drink Options (optional)</div>
+        {renderList(drink, "drink")}
+
+        <div style={{ fontFamily:"'Nunito',sans-serif", fontSize:13, color:"#999", marginTop:8, marginBottom:20, lineHeight:1.5 }}>
+          {food.length === 0
+            ? "Add at least one food option to turn this into a menu. When food options exist, tapping this button will show the menu instead of speaking directly."
+            : `Tapping ${item.name} will show these ${food.length} food option${food.length!==1?"s":""}${drink.length>0?` then ${drink.length} drink option${drink.length!==1?"s":""}`:""}, then say "I want ${item.name} [food]${drink.length>0?" and [drink]":""}".`
+          }
+        </div>
+
+        <button onClick={handleDone} style={{
+          width:"100%", padding:14, borderRadius:14, border:"none",
+          background:color, color:"#fff", fontSize:17, fontWeight:800,
+          fontFamily:"'Nunito',sans-serif", cursor:"pointer",
+        }}>✅ Done</button>
+      </div>
+    </div>
+  );
+}
+
 function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
   const [items, setItems] = useState(category.items);
   const [search, setSearch] = useState("");
@@ -690,6 +876,18 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [confetti, setConfetti] = useState(false);
+  const [orderItem, setOrderItem] = useState(null);
+  const [manageMenuItem, setManageMenuItem] = useState(null);
+
+  function handleSaveSubMenu(updatedItem) {
+    persist(items.map(i => i.id===updatedItem.id ? updatedItem : i));
+    setManageMenuItem(null);
+  }
+
+  function handleOrderComplete(phrase) {
+    setOrderItem(null);
+    handleSpeak(phrase);
+  }
 
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -746,6 +944,22 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
     setTimeout(() => onBack(), 2000);
   }
 
+  // If ordering from a restaurant menu, show that flow instead
+  if (orderItem) {
+    return (
+      <RestaurantOrderScreen item={orderItem} color={category.color} dark={category.dark} light={category.light}
+        onBack={()=>setOrderItem(null)} onComplete={handleOrderComplete} />
+    );
+  }
+
+  // If managing a restaurant's sub-menu, show that screen instead
+  if (manageMenuItem) {
+    return (
+      <SubMenuEditScreen item={manageMenuItem} color={category.color}
+        onBack={()=>setManageMenuItem(null)} onSave={handleSaveSubMenu} />
+    );
+  }
+
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#eef2ff 0%,#fafbff 100%)", display:"flex", flexDirection:"column" }}>
       <Confetti active={confetti} />
@@ -793,7 +1007,8 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
         {filtered.map((item,i) => (
           <BlobCard key={item.id} item={item} phrase={category.phrase}
             color={category.color} dark={category.dark} light={category.light}
-            index={i} onSpeak={handleSpeak} onEdit={setEditItem} onDelete={handleDelete} parentMode={parentMode} />
+            index={i} onSpeak={handleSpeak} onEdit={setEditItem} onDelete={handleDelete} parentMode={parentMode}
+            onOpenMenu={setOrderItem} onManageMenu={setManageMenuItem} />
         ))}
         {/* Always-visible camera blob */}
         <CameraBlobCard color={category.color} dark={category.dark} light={category.light}
@@ -1437,6 +1652,8 @@ export default function MyVoiceApp() {
                     }}
                     onEdit={()=>{}}
                     onDelete={()=>{}}
+                    onOpenMenu={()=>{}}
+                    onManageMenu={()=>{}}
                     parentMode={false}
                   />
                   <div style={{ fontSize:10, color:"#aaa", fontFamily:"'Nunito',sans-serif", marginTop:2 }}>{category.label}</div>
