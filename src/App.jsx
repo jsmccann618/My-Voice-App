@@ -1723,7 +1723,17 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
               const bp = BLOB_PATHS[idx % BLOB_PATHS.length];
               const uid2 = `vm_${item.id}`;
               return (
-                <button key={item.id} onClick={()=>handleSelect(item, category)} style={{
+                <a key={item.id} href={getDeepLink(item)?.app || "#"} 
+                  onClick={(e)=>{
+                    if (!getDeepLink(item)) e.preventDefault();
+                    handleSelect(item, category);
+                  }}
+                  style={{
+                    background:"none", border:"none", cursor:"pointer", padding:0,
+                    display:"flex", flexDirection:"column", alignItems:"center",
+                    filter:`drop-shadow(0 6px 16px ${category.dark}88)`,
+                    textDecoration:"none",
+                  }}>
                   background:"none", border:"none", cursor:"pointer", padding:0,
                   display:"flex", flexDirection:"column", alignItems:"center",
                   filter:`drop-shadow(0 6px 16px ${category.dark}88)`,
@@ -1747,7 +1757,7 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
                     <ellipse cx="36" cy="26" rx="15" ry="10" fill="white" opacity="0.3" transform="rotate(-20,36,26)" />
                   </svg>
                   <span style={{ color:"#fff", fontSize:14, fontWeight:900, fontFamily:"'Nunito',sans-serif", marginTop:4, textAlign:"center" }}>{item.name}</span>
-                </button>
+                </a>
               );
             })}
           </div>
