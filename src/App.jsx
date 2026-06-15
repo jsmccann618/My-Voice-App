@@ -1567,26 +1567,47 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
   }
 
   function findMatch(text) {
-    // First apply phonetic aliases
-    const normalized = applyAliases(text);
-    const q = normalized.toLowerCase();
+    const original = text.toLowerCase().trim();
+    const normalized = applyAliases(original);
+    
+    // Try exact/contains match on normalized text first
     let best = null;
     let bestScore = 0;
-    allItems.forEach(({ item, category }) => {
-      const targets = [
-        item.name,
-        category.label,
-        ...item.name.split(" "),
-        ...category.label.split(" "),
-      ];
+
+    for (const { item, category } of allItems) {
+      const targets = [item.name.toLowerCase(), category.label.toLowerCase()];
       for (const t of targets) {
-        if (t.length < 2) continue;
-        if (fuzzyMatch(q, t)) {
-          const score = t.length;
+        // Exact or contains match — highest priority
+        if (normalized.includes(t) || t.includes(normalized)) {
+          const score = t.length + 100; // boost exact matches
           if (score > bestScore) { best = { item, category }; bestScore = score; }
         }
       }
-    });
+    }
+
+    // Only use fuzzy if we didn't find an exact/contains match
+    if (!best) {
+      for (const { item, category } of allItems) {
+        const targets = [item.name, category.label];
+        for (const t of targets) {
+          if (t.length < 4) continue; // skip very short targets
+          const words = normalized.split(/\s+/);
+          const targetWords = t.toLowerCase().split(/\s+/);
+          for (const tw of targetWords) {
+            if (tw.length < 4) continue;
+            for (const sw of words) {
+              if (sw.length < 4) continue;
+              // Only match if very close — max 1 error per 5 chars
+              if (levenshtein(sw, tw) <= Math.floor(Math.max(sw.length, tw.length) / 5)) {
+                const score = tw.length;
+                if (score > bestScore) { best = { item, category }; bestScore = score; }
+              }
+            }
+          }
+        }
+      }
+    }
+
     return best;
   }
 
