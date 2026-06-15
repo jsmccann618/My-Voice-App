@@ -1495,6 +1495,7 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
   const [status, setStatus] = useState("Tap the mic to start!");
   const [showPinModal, setShowPinModal] = useState(false);
   const [debug, setDebug] = useState([]);
+  const recogRef = useRef(null);
 
   const allItems = [];
   categories.forEach(cat => {
@@ -1532,23 +1533,56 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
     return dp[m][n];
   }
 
+  // Phonetic aliases — maps what speech recognition hears to what we want to match
+  const PHONETIC_ALIASES = {
+    "you too": "youtube",
+    "you tube": "youtube",
+    "you to": "youtube",
+    "utube": "youtube",
+    "disney": "disney+",
+    "disney plus": "disney+",
+    "amazon": "amazon music",
+    "music": "amazon music",
+    "mcdonald": "mcdonald's",
+    "mac donald": "mcdonald's",
+    "mac donalds": "mcdonald's",
+    "burger king": "burger king",
+    "nugget": "chicken nuggets",
+    "nuggets": "chicken nuggets",
+    "mac cheese": "mac & cheese",
+    "macaroni": "mac & cheese",
+    "eat": "i want to eat",
+    "go": "i want to go",
+    "drink": "i want to drink",
+    "help": "i need help",
+    "feel": "i feel",
+  };
+
+  function applyAliases(text) {
+    let t = text.toLowerCase().trim();
+    for (const [alias, replacement] of Object.entries(PHONETIC_ALIASES)) {
+      if (t.includes(alias)) t = t.replace(alias, replacement);
+    }
+    return t;
+  }
+
   function findMatch(text) {
-    const q = text.toLowerCase();
-    // Score each item — higher score = better match
+    // First apply phonetic aliases
+    const normalized = applyAliases(text);
+    const q = normalized.toLowerCase();
     let best = null;
     let bestScore = 0;
     allItems.forEach(({ item, category }) => {
       const targets = [
         item.name,
         category.label,
-        // Also try without common words like "I Want to"
         ...item.name.split(" "),
         ...category.label.split(" "),
       ];
       for (const t of targets) {
         if (t.length < 2) continue;
         if (fuzzyMatch(q, t)) {
-          const score = t.length; // longer match = more specific = higher priority
+          const score = t.length;
           if (score > bestScore) { best = { item, category }; bestScore = score; }
         }
       }
