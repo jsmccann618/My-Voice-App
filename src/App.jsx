@@ -1488,7 +1488,7 @@ function ChoiceBoardScreen({ onBack }) {
 }
 
 // ─── Voice Activated Screen ───────────────────────────────────────────────────
-function VoiceActivatedScreen({ categories, onSpeak, onExit }) {
+function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [matched, setMatched] = useState(null);
@@ -1568,7 +1568,7 @@ function VoiceActivatedScreen({ categories, onSpeak, onExit }) {
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#667eea,#764ba2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24 }}>
       {/* PIN Modal to exit */}
       {showPinModal && (
-        <PinModal title="Exit Voice Mode" correctPin={categories._pin || "1234"}
+        <PinModal title="Exit Voice Mode" correctPin={parentPin}
           onSuccess={onExit} onClose={()=>setShowPinModal(false)} />
       )}
 
@@ -1753,12 +1753,16 @@ export default function MyVoiceApp() {
       {loaded && screen==="home" && voiceMode && !parentMode && (
         <VoiceActivatedScreen
           categories={data.categories}
+          parentPin={data.parentPin}
           onSpeak={(text) => {
             speak(text);
             sendMessage(text);
             fetch("/api/notify", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message:text }) }).catch(()=>{});
           }}
-          onExit={()=>setVoiceMode(false)}
+          onExit={()=>{
+            setVoiceMode(false);
+            saveData({ ...data, voiceMode: false });
+          }}
         />
       )}
       {loaded && screen==="home" && (!voiceMode || parentMode) && (
