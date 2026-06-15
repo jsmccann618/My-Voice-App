@@ -1491,11 +1491,11 @@ function ChoiceBoardScreen({ onBack }) {
 function VoiceActivatedScreen({ categories, onSpeak, onExit }) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [matched, setMatched] = useState(null); // { item, category }
+  const [matched, setMatched] = useState(null);
   const [status, setStatus] = useState("Tap the mic to start!");
+  const [showPinModal, setShowPinModal] = useState(false);
   const recogRef = useRef(null);
 
-  // Build a flat list of all items for matching
   const allItems = [];
   categories.forEach(cat => {
     cat.items?.forEach(item => allItems.push({ item, category: cat }));
@@ -1560,57 +1560,77 @@ function VoiceActivatedScreen({ categories, onSpeak, onExit }) {
     setStatus("Tap the mic to start!");
   }
 
+  // Get the current parentPin from categories context — passed via prop
+  const blobPath = matched ? BLOB_PATHS[0] : null;
+  const uid = matched ? `vm_${matched.item.id}` : null;
+
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#667eea,#764ba2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24 }}>
+      {/* PIN Modal to exit */}
+      {showPinModal && (
+        <PinModal title="Exit Voice Mode" correctPin={categories._pin || "1234"}
+          onSuccess={onExit} onClose={()=>setShowPinModal(false)} />
+      )}
+
+      {/* Edit button — PIN protected */}
       <div style={{ position:"absolute", top:20, right:20 }}>
-        <button onClick={onExit} style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:12, padding:"8px 14px", cursor:"pointer", color:"#fff", fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13 }}>✕ Exit</button>
+        <button onClick={()=>setShowPinModal(true)} style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:12, padding:"8px 14px", cursor:"pointer", color:"#fff", fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13 }}>🔐 Edit</button>
       </div>
 
       <div style={{ fontSize:40, marginBottom:8 }}>🎤</div>
       <div style={{ color:"#fff", fontSize:26, fontWeight:900, fontFamily:"'Nunito',sans-serif", marginBottom:4 }}>Voice Mode</div>
-      <div style={{ color:"rgba(255,255,255,0.8)", fontSize:14, fontFamily:"'Nunito',sans-serif", marginBottom:40, textAlign:"center" }}>
+      <div style={{ color:"rgba(255,255,255,0.8)", fontSize:14, fontFamily:"'Nunito',sans-serif", marginBottom:32, textAlign:"center" }}>
         Say what you want and it will appear!
       </div>
 
       {/* Status */}
-      <div style={{ color:"rgba(255,255,255,0.9)", fontSize:16, fontWeight:700, fontFamily:"'Nunito',sans-serif", marginBottom:24, textAlign:"center" }}>
+      <div style={{ color:"rgba(255,255,255,0.9)", fontSize:16, fontWeight:700, fontFamily:"'Nunito',sans-serif", marginBottom:20, textAlign:"center" }}>
         {status}
       </div>
 
-      {/* Transcript */}
+      {/* Transcript (no match yet) */}
       {transcript && !matched && (
-        <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:16, padding:"12px 20px", marginBottom:24, color:"#fff", fontFamily:"'Nunito',sans-serif", fontSize:15, textAlign:"center" }}>
+        <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:16, padding:"12px 20px", marginBottom:20, color:"#fff", fontFamily:"'Nunito',sans-serif", fontSize:15, textAlign:"center" }}>
           I heard: "{transcript}"
         </div>
       )}
 
-      {/* Matched item — show the blob */}
+      {/* Matched — show actual blob button */}
       {matched && (
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:24, animation:"fadeIn 0.3s ease" }}>
-          <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:20, padding:16, marginBottom:12, textAlign:"center" }}>
-            <div style={{ color:"rgba(255,255,255,0.7)", fontSize:12, fontFamily:"'Nunito',sans-serif", marginBottom:8 }}>
-              I heard "{transcript}" — is this what you want?
-            </div>
-            <div style={{
-              width:140, height:140, borderRadius:24, overflow:"hidden",
-              background:matched.category.color, display:"flex", alignItems:"center",
-              justifyContent:"center", margin:"0 auto 8px", boxShadow:"0 8px 24px rgba(0,0,0,0.3)",
-            }}>
-              {matched.item.photo
-                ? <img src={matched.item.photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                : <span style={{ fontSize:64 }}>{matched.item.emoji}</span>
-              }
-            </div>
-            <div style={{ color:"#fff", fontSize:20, fontWeight:900, fontFamily:"'Nunito',sans-serif" }}>{matched.item.name}</div>
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:20, animation:"fadeIn 0.3s ease" }}>
+          <div style={{ color:"rgba(255,255,255,0.8)", fontSize:13, fontFamily:"'Nunito',sans-serif", marginBottom:12, textAlign:"center" }}>
+            Is this what you want?
           </div>
+          {/* Real blob button */}
           <button onClick={handleSelect} style={{
-            padding:"16px 40px", borderRadius:18, border:"none",
-            background:"#10B981", color:"#fff", fontSize:18, fontWeight:900,
-            fontFamily:"'Nunito',sans-serif", cursor:"pointer",
-            boxShadow:"0 4px 16px rgba(16,185,129,0.4)", marginBottom:12,
-          }}>✅ Yes, that's it!</button>
+            background:"none", border:"none", cursor:"pointer", padding:0,
+            display:"flex", flexDirection:"column", alignItems:"center",
+            filter:`drop-shadow(0 8px 20px ${matched.category.dark}88)`,
+          }}>
+            <svg viewBox="0 0 100 100" style={{ width:180, height:180, display:"block", overflow:"visible" }}>
+              <defs>
+                <radialGradient id={`${uid}_g`} cx="38%" cy="28%" r="65%">
+                  <stop offset="0%" stopColor={matched.category.light} />
+                  <stop offset="48%" stopColor={matched.category.color} />
+                  <stop offset="100%" stopColor={matched.category.dark} />
+                </radialGradient>
+                <clipPath id={`${uid}_c`}><path d={blobPath} /></clipPath>
+              </defs>
+              <path d={blobPath} fill={`url(#${uid}_g)`} />
+              {matched.item.photo ? (
+                <image href={matched.item.photo} x="8" y="8" width="84" height="84"
+                  clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid slice" opacity="0.9" />
+              ) : (
+                <text x="50" y="55" textAnchor="middle" dominantBaseline="middle" fontSize="40">{matched.item.emoji}</text>
+              )}
+              <ellipse cx="36" cy="26" rx="15" ry="10" fill="white" opacity="0.3" transform="rotate(-20,36,26)" />
+              <ellipse cx="30" cy="21" rx="7" ry="4" fill="white" opacity="0.4" transform="rotate(-20,30,21)" />
+            </svg>
+            <span style={{ color:"#fff", fontSize:20, fontWeight:900, fontFamily:"'Nunito',sans-serif", marginTop:6 }}>{matched.item.name}</span>
+            <span style={{ color:"rgba(255,255,255,0.7)", fontSize:13, fontFamily:"'Nunito',sans-serif", marginTop:2 }}>Tap to select!</span>
+          </button>
           <button onClick={handleTryAgain} style={{
-            padding:"12px 32px", borderRadius:14, border:"2px solid rgba(255,255,255,0.4)",
+            marginTop:20, padding:"12px 32px", borderRadius:14, border:"2px solid rgba(255,255,255,0.4)",
             background:"transparent", color:"#fff", fontSize:15, fontWeight:700,
             fontFamily:"'Nunito',sans-serif", cursor:"pointer",
           }}>🔄 Try Again</button>
@@ -1661,6 +1681,8 @@ export default function MyVoiceApp() {
     loadFromFirestore(SEED_DATA).then(d => {
       setData(d);
       setLoaded(true);
+      // Restore voice mode from saved data
+      if (d.voiceMode) setVoiceMode(true);
     });
     const sub = subscribeToMessages(msg => {
       if (msg.message === "👍 On my way!") {
@@ -1766,7 +1788,11 @@ export default function MyVoiceApp() {
                   </button>
                 )}
                 {parentMode && (
-                  <button onClick={()=>setVoiceMode(v=>!v)} style={{
+                  <button onClick={()=>{
+                    const newMode = !voiceMode;
+                    setVoiceMode(newMode);
+                    saveData({ ...data, voiceMode: newMode });
+                  }} style={{
                     background:voiceMode?"#10B981":"rgba(255,255,255,0.22)",
                     border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",
                     fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff"
