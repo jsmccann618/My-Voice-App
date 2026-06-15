@@ -1491,7 +1491,7 @@ function ChoiceBoardScreen({ onBack }) {
 function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [matched, setMatched] = useState(null);
+  const [matched, setMatched] = useState([]); // now an array
   const [status, setStatus] = useState("Tap the mic to start!");
   const [showPinModal, setShowPinModal] = useState(false);
   const [debug, setDebug] = useState([]);
@@ -1566,49 +1566,44 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
     return t;
   }
 
-  function findMatch(text) {
+  function findMatches(text) {
     const original = text.toLowerCase().trim();
     const normalized = applyAliases(original);
     
-    // Try exact/contains match on normalized text first
-    let best = null;
-    let bestScore = 0;
+    const matches = [];
+    const seen = new Set();
 
     for (const { item, category } of allItems) {
       const targets = [item.name.toLowerCase(), category.label.toLowerCase()];
+      let score = 0;
       for (const t of targets) {
-        // Exact or contains match — highest priority
         if (normalized.includes(t) || t.includes(normalized)) {
-          const score = t.length + 100; // boost exact matches
-          if (score > bestScore) { best = { item, category }; bestScore = score; }
+          score = t.length + 100;
+          break;
         }
       }
-    }
-
-    // Only use fuzzy if we didn't find an exact/contains match
-    if (!best) {
-      for (const { item, category } of allItems) {
-        const targets = [item.name, category.label];
-        for (const t of targets) {
-          if (t.length < 4) continue; // skip very short targets
-          const words = normalized.split(/\s+/);
-          const targetWords = t.toLowerCase().split(/\s+/);
-          for (const tw of targetWords) {
-            if (tw.length < 4) continue;
-            for (const sw of words) {
-              if (sw.length < 4) continue;
-              // Only match if very close — max 1 error per 5 chars
-              if (levenshtein(sw, tw) <= Math.floor(Math.max(sw.length, tw.length) / 5)) {
-                const score = tw.length;
-                if (score > bestScore) { best = { item, category }; bestScore = score; }
-              }
+      // Fuzzy if no exact match
+      if (!score) {
+        const words = normalized.split(/\s+/);
+        const targetWords = [...item.name.toLowerCase().split(/\s+/), ...category.label.toLowerCase().split(/\s+/)];
+        for (const tw of targetWords) {
+          if (tw.length < 4) continue;
+          for (const sw of words) {
+            if (sw.length < 4) continue;
+            if (levenshtein(sw, tw) <= Math.floor(Math.max(sw.length, tw.length) / 5)) {
+              score = Math.max(score, tw.length);
             }
           }
         }
       }
+      if (score > 0 && !seen.has(item.id)) {
+        seen.add(item.id);
+        matches.push({ item, category, score });
+      }
     }
 
-    return best;
+    // Sort by score, return top 4
+    return matches.sort((a,b) => b.score - a.score).slice(0, 4);
   }
 
   function startListening() {
@@ -1630,17 +1625,19 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
       const combined = texts.join(" ");
       setTranscript(combined);
       setDebug(texts);
-      let match = null;
+      let allMatches = [];
       for (const t of texts) {
-        match = findMatch(t);
-        if (match) break;
+        const found = findMatches(t);
+        found.forEach(m => {
+          if (!allMatches.find(x => x.item.id === m.item.id)) allMatches.push(m);
+        });
       }
-      if (match) setMatched(match);
+      if (allMatches.length > 0) setMatched(allMatches.slice(0, 4));
     };
     recog.onend = () => {
       setListening(false);
-      if (!matched) setStatus("Didn't catch that — try again!");
-      else setStatus("Great job! 🎉");
+      if (matched.length === 0) setStatus("Didn't catch that — try again!");
+      else setStatus("Is this what you want?");
     };
     recog.onerror = (e) => {
       setListening(false);
@@ -1652,24 +1649,22 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
   }
 
   function handleTryAgain() {
-    setMatched(null);
+    setMatched([]);
     setTranscript("");
+    setDebug([]);
     setStatus("Tap the mic to start!");
   }
 
-  function handleSelect() {
-    if (!matched) return;
-    const { item, category } = matched;
+  function handleSelect(item, category) {
     const full = category.phrase ? `${category.phrase} ${item.name}` : item.name;
     onSpeak(full);
-    setMatched(null);
+    setMatched([]);
     setTranscript("");
+    setDebug([]);
     setStatus("Tap the mic to start!");
   }
 
   // Get the current parentPin from categories context — passed via prop
-  const blobPath = matched ? BLOB_PATHS[0] : null;
-  const uid = matched ? `vm_${matched.item.id}` : null;
 
   return (
     <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#667eea,#764ba2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24 }}>
@@ -1702,40 +1697,45 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
         </div>
       )}
 
-      {/* Matched — show actual blob button */}
-      {matched && (
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:20, animation:"fadeIn 0.3s ease" }}>
-          <div style={{ color:"rgba(255,255,255,0.8)", fontSize:13, fontFamily:"'Nunito',sans-serif", marginBottom:12, textAlign:"center" }}>
-            Is this what you want?
+      {/* Matched — show actual blob buttons for all matches */}
+      {matched.length > 0 && (
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:"100%", animation:"fadeIn 0.3s ease" }}>
+          <div style={{ color:"rgba(255,255,255,0.8)", fontSize:14, fontFamily:"'Nunito',sans-serif", marginBottom:16, textAlign:"center" }}>
+            {matched.length === 1 ? "Is this what you want?" : "Which one did you mean?"}
           </div>
-          {/* Real blob button */}
-          <button onClick={handleSelect} style={{
-            background:"none", border:"none", cursor:"pointer", padding:0,
-            display:"flex", flexDirection:"column", alignItems:"center",
-            filter:`drop-shadow(0 8px 20px ${matched.category.dark}88)`,
-          }}>
-            <svg viewBox="0 0 100 100" style={{ width:180, height:180, display:"block", overflow:"visible" }}>
-              <defs>
-                <radialGradient id={`${uid}_g`} cx="38%" cy="28%" r="65%">
-                  <stop offset="0%" stopColor={matched.category.light} />
-                  <stop offset="48%" stopColor={matched.category.color} />
-                  <stop offset="100%" stopColor={matched.category.dark} />
-                </radialGradient>
-                <clipPath id={`${uid}_c`}><path d={blobPath} /></clipPath>
-              </defs>
-              <path d={blobPath} fill={`url(#${uid}_g)`} />
-              {matched.item.photo ? (
-                <image href={matched.item.photo} x="8" y="8" width="84" height="84"
-                  clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid slice" opacity="0.9" />
-              ) : (
-                <text x="50" y="55" textAnchor="middle" dominantBaseline="middle" fontSize="40">{matched.item.emoji}</text>
-              )}
-              <ellipse cx="36" cy="26" rx="15" ry="10" fill="white" opacity="0.3" transform="rotate(-20,36,26)" />
-              <ellipse cx="30" cy="21" rx="7" ry="4" fill="white" opacity="0.4" transform="rotate(-20,30,21)" />
-            </svg>
-            <span style={{ color:"#fff", fontSize:20, fontWeight:900, fontFamily:"'Nunito',sans-serif", marginTop:6 }}>{matched.item.name}</span>
-            <span style={{ color:"rgba(255,255,255,0.7)", fontSize:13, fontFamily:"'Nunito',sans-serif", marginTop:2 }}>Tap to select!</span>
-          </button>
+          <div style={{ display:"grid", gridTemplateColumns: matched.length === 1 ? "1fr" : "1fr 1fr", gap:12, width:"100%", maxWidth:360 }}>
+            {matched.map(({ item, category }, idx) => {
+              const bp = BLOB_PATHS[idx % BLOB_PATHS.length];
+              const uid2 = `vm_${item.id}`;
+              return (
+                <button key={item.id} onClick={()=>handleSelect(item, category)} style={{
+                  background:"none", border:"none", cursor:"pointer", padding:0,
+                  display:"flex", flexDirection:"column", alignItems:"center",
+                  filter:`drop-shadow(0 6px 16px ${category.dark}88)`,
+                }}>
+                  <svg viewBox="0 0 100 100" style={{ width: matched.length===1?180:140, height:matched.length===1?180:140, display:"block", overflow:"visible" }}>
+                    <defs>
+                      <radialGradient id={`${uid2}_g`} cx="38%" cy="28%" r="65%">
+                        <stop offset="0%" stopColor={category.light} />
+                        <stop offset="48%" stopColor={category.color} />
+                        <stop offset="100%" stopColor={category.dark} />
+                      </radialGradient>
+                      <clipPath id={`${uid2}_c`}><path d={bp} /></clipPath>
+                    </defs>
+                    <path d={bp} fill={`url(#${uid2}_g)`} />
+                    {item.photo ? (
+                      <image href={item.photo} x="8" y="8" width="84" height="84"
+                        clipPath={`url(#${uid2}_c)`} preserveAspectRatio="xMidYMid slice" opacity="0.9" />
+                    ) : (
+                      <text x="50" y="55" textAnchor="middle" dominantBaseline="middle" fontSize="38">{item.emoji}</text>
+                    )}
+                    <ellipse cx="36" cy="26" rx="15" ry="10" fill="white" opacity="0.3" transform="rotate(-20,36,26)" />
+                  </svg>
+                  <span style={{ color:"#fff", fontSize:14, fontWeight:900, fontFamily:"'Nunito',sans-serif", marginTop:4, textAlign:"center" }}>{item.name}</span>
+                </button>
+              );
+            })}
+          </div>
           <button onClick={handleTryAgain} style={{
             marginTop:20, padding:"12px 32px", borderRadius:14, border:"2px solid rgba(255,255,255,0.4)",
             background:"transparent", color:"#fff", fontSize:15, fontWeight:700,
@@ -1744,10 +1744,10 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
         </div>
       )}
 
-      {/* Debug panel — shows all heard alternatives */}
-      {debug.length > 0 && !matched && (
+      {/* Debug panel */}
+      {debug.length > 0 && matched.length === 0 && (
         <div style={{ background:"rgba(0,0,0,0.3)", borderRadius:12, padding:"10px 16px", marginBottom:16, width:"100%", maxWidth:360 }}>
-          <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontFamily:"'Nunito',sans-serif", marginBottom:6 }}>I heard these alternatives:</div>
+          <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontFamily:"'Nunito',sans-serif", marginBottom:6 }}>I heard:</div>
           {debug.map((t,i) => (
             <div key={i} style={{ color:"#fff", fontSize:13, fontFamily:"'Nunito',sans-serif", fontWeight:600 }}>• "{t}"</div>
           ))}
@@ -1755,6 +1755,7 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
       )}
 
       {/* Mic button */}
+      {matched.length === 0 && (
       {!matched && (
         <button onClick={startListening} disabled={listening} style={{
           width:120, height:120, borderRadius:"50%", border:"none",
