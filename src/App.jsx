@@ -1664,6 +1664,21 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
     setStatus("Tap the mic to start!");
   }
 
+  function getDeepLink(item) {
+    const DEEP_LINKS = {
+      "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
+      "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
+      "amazon music":  { app: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune", web: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune" },
+      "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
+      "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
+      "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
+      "apple music":   { app: "music://",        web: "https://music.apple.com" },
+      "youtube kids":  { app: "youtubekids://",  web: "https://www.youtubekids.com" },
+    };
+    const nameKey = item.name.toLowerCase().trim();
+    return item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
+  }
+
   // Get the current parentPin from categories context — passed via prop
 
   return (
