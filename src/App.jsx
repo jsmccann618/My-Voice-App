@@ -1487,6 +1487,159 @@ function ChoiceBoardScreen({ onBack }) {
   );
 }
 
+// ─── Voice Activated Screen ───────────────────────────────────────────────────
+function VoiceActivatedScreen({ categories, onSpeak, onExit }) {
+  const [listening, setListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [matched, setMatched] = useState(null); // { item, category }
+  const [status, setStatus] = useState("Tap the mic to start!");
+  const recogRef = useRef(null);
+
+  // Build a flat list of all items for matching
+  const allItems = [];
+  categories.forEach(cat => {
+    cat.items?.forEach(item => allItems.push({ item, category: cat }));
+  });
+
+  function findMatch(text) {
+    const q = text.toLowerCase();
+    return allItems.find(({ item, category }) =>
+      q.includes(item.name.toLowerCase()) ||
+      q.includes(category.label.toLowerCase())
+    );
+  }
+
+  function startListening() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setStatus("Sorry, voice recognition isn't supported on this browser.");
+      return;
+    }
+    const recog = new SpeechRecognition();
+    recog.lang = "en-US";
+    recog.continuous = false;
+    recog.interimResults = true;
+    recog.maxAlternatives = 5;
+
+    recog.onstart = () => { setListening(true); setStatus("Listening..."); setTranscript(""); setMatched(null); };
+    recog.onresult = (e) => {
+      const results = Array.from(e.results);
+      const texts = results.flatMap(r => Array.from(r)).map(r => r.transcript);
+      const combined = texts.join(" ");
+      setTranscript(combined);
+      const match = texts.map(t => findMatch(t)).find(Boolean);
+      if (match) setMatched(match);
+    };
+    recog.onend = () => {
+      setListening(false);
+      if (!matched) setStatus("Didn't catch that — try again!");
+      else setStatus("Great job! 🎉");
+    };
+    recog.onerror = (e) => {
+      setListening(false);
+      setStatus(e.error === "not-allowed" ? "Microphone permission denied." : "Try again!");
+    };
+
+    recogRef.current = recog;
+    recog.start();
+  }
+
+  function handleTryAgain() {
+    setMatched(null);
+    setTranscript("");
+    setStatus("Tap the mic to start!");
+  }
+
+  function handleSelect() {
+    if (!matched) return;
+    const { item, category } = matched;
+    const full = category.phrase ? `${category.phrase} ${item.name}` : item.name;
+    onSpeak(full);
+    setMatched(null);
+    setTranscript("");
+    setStatus("Tap the mic to start!");
+  }
+
+  return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#667eea,#764ba2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ position:"absolute", top:20, right:20 }}>
+        <button onClick={onExit} style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:12, padding:"8px 14px", cursor:"pointer", color:"#fff", fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:13 }}>✕ Exit</button>
+      </div>
+
+      <div style={{ fontSize:40, marginBottom:8 }}>🎤</div>
+      <div style={{ color:"#fff", fontSize:26, fontWeight:900, fontFamily:"'Nunito',sans-serif", marginBottom:4 }}>Voice Mode</div>
+      <div style={{ color:"rgba(255,255,255,0.8)", fontSize:14, fontFamily:"'Nunito',sans-serif", marginBottom:40, textAlign:"center" }}>
+        Say what you want and it will appear!
+      </div>
+
+      {/* Status */}
+      <div style={{ color:"rgba(255,255,255,0.9)", fontSize:16, fontWeight:700, fontFamily:"'Nunito',sans-serif", marginBottom:24, textAlign:"center" }}>
+        {status}
+      </div>
+
+      {/* Transcript */}
+      {transcript && !matched && (
+        <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:16, padding:"12px 20px", marginBottom:24, color:"#fff", fontFamily:"'Nunito',sans-serif", fontSize:15, textAlign:"center" }}>
+          I heard: "{transcript}"
+        </div>
+      )}
+
+      {/* Matched item — show the blob */}
+      {matched && (
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:24, animation:"fadeIn 0.3s ease" }}>
+          <div style={{ background:"rgba(255,255,255,0.15)", borderRadius:20, padding:16, marginBottom:12, textAlign:"center" }}>
+            <div style={{ color:"rgba(255,255,255,0.7)", fontSize:12, fontFamily:"'Nunito',sans-serif", marginBottom:8 }}>
+              I heard "{transcript}" — is this what you want?
+            </div>
+            <div style={{
+              width:140, height:140, borderRadius:24, overflow:"hidden",
+              background:matched.category.color, display:"flex", alignItems:"center",
+              justifyContent:"center", margin:"0 auto 8px", boxShadow:"0 8px 24px rgba(0,0,0,0.3)",
+            }}>
+              {matched.item.photo
+                ? <img src={matched.item.photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                : <span style={{ fontSize:64 }}>{matched.item.emoji}</span>
+              }
+            </div>
+            <div style={{ color:"#fff", fontSize:20, fontWeight:900, fontFamily:"'Nunito',sans-serif" }}>{matched.item.name}</div>
+          </div>
+          <button onClick={handleSelect} style={{
+            padding:"16px 40px", borderRadius:18, border:"none",
+            background:"#10B981", color:"#fff", fontSize:18, fontWeight:900,
+            fontFamily:"'Nunito',sans-serif", cursor:"pointer",
+            boxShadow:"0 4px 16px rgba(16,185,129,0.4)", marginBottom:12,
+          }}>✅ Yes, that's it!</button>
+          <button onClick={handleTryAgain} style={{
+            padding:"12px 32px", borderRadius:14, border:"2px solid rgba(255,255,255,0.4)",
+            background:"transparent", color:"#fff", fontSize:15, fontWeight:700,
+            fontFamily:"'Nunito',sans-serif", cursor:"pointer",
+          }}>🔄 Try Again</button>
+        </div>
+      )}
+
+      {/* Mic button */}
+      {!matched && (
+        <button onClick={startListening} disabled={listening} style={{
+          width:120, height:120, borderRadius:"50%", border:"none",
+          background:listening ? "#EF4444" : "rgba(255,255,255,0.95)",
+          cursor:listening ? "default" : "pointer",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:52, boxShadow:listening ? "0 0 0 20px rgba(239,68,68,0.3)" : "0 8px 28px rgba(0,0,0,0.25)",
+          transition:"all 0.3s ease",
+          animation: listening ? "pulse 1.2s infinite" : "none",
+        }}>
+          {listening ? "⏹️" : "🎤"}
+        </button>
+      )}
+
+      <style>{`
+        @keyframes pulse { 0%,100%{box-shadow:0 0 0 20px rgba(239,68,68,0.2)} 50%{box-shadow:0 0 0 35px rgba(239,68,68,0.05)} }
+        @keyframes fadeIn { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+      `}</style>
+    </div>
+  );
+}
+
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function MyVoiceApp() {
   const [data, setData] = useState(SEED_DATA);
@@ -1499,6 +1652,7 @@ export default function MyVoiceApp() {
   const [showOnMyWay, setShowOnMyWay] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [voiceMode, setVoiceMode] = useState(false);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -1574,7 +1728,18 @@ export default function MyVoiceApp() {
         <PinModal title="Parent Mode" correctPin={data.parentPin}
           onSuccess={handlePinSuccess} onClose={()=>setShowPinModal(false)} />
       )}
-      {loaded && screen==="home" && (
+      {loaded && screen==="home" && voiceMode && !parentMode && (
+        <VoiceActivatedScreen
+          categories={data.categories}
+          onSpeak={(text) => {
+            speak(text);
+            sendMessage(text);
+            fetch("/api/notify", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message:text }) }).catch(()=>{});
+          }}
+          onExit={()=>setVoiceMode(false)}
+        />
+      )}
+      {loaded && screen==="home" && (!voiceMode || parentMode) && (
         <div style={{ minHeight:"100vh", background:"linear-gradient(180deg,#eef2ff 0%,#fafbff 100%)" }}>
           {/* Header */}
           <div style={{ background:"linear-gradient(135deg,#667eea 0%,#764ba2 100%)",padding:"24px 24px 16px",boxShadow:"0 4px 24px rgba(102,126,234,0.3)" }}>
@@ -1598,6 +1763,15 @@ export default function MyVoiceApp() {
                 {parentMode && (
                   <button onClick={()=>setScreen("settings")} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
                     ⚙️ Settings
+                  </button>
+                )}
+                {parentMode && (
+                  <button onClick={()=>setVoiceMode(v=>!v)} style={{
+                    background:voiceMode?"#10B981":"rgba(255,255,255,0.22)",
+                    border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",
+                    fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff"
+                  }}>
+                    {voiceMode ? "🎤 Voice Mode ON" : "🎤 Voice Mode"}
                   </button>
                 )}
                 <button onClick={()=>setScreen("choice")} style={{ background:"rgba(255,255,255,0.22)",border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff" }}>
