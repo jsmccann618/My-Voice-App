@@ -1494,19 +1494,66 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
   const [matched, setMatched] = useState(null);
   const [status, setStatus] = useState("Tap the mic to start!");
   const [showPinModal, setShowPinModal] = useState(false);
-  const recogRef = useRef(null);
+  const [debug, setDebug] = useState([]);
 
   const allItems = [];
   categories.forEach(cat => {
     cat.items?.forEach(item => allItems.push({ item, category: cat }));
   });
 
+  // Fuzzy match — checks multiple ways a word could be close enough
+  function fuzzyMatch(spoken, target) {
+    const s = spoken.toLowerCase().trim();
+    const t = target.toLowerCase().trim();
+    if (s.includes(t) || t.includes(s)) return true;
+    // Check if spoken starts with at least 3 chars of target
+    if (t.length >= 3 && s.includes(t.slice(0, 3))) return true;
+    // Check each word in spoken against each word in target
+    const spokenWords = s.split(/\s+/);
+    const targetWords = t.split(/\s+/);
+    for (const sw of spokenWords) {
+      for (const tw of targetWords) {
+        if (sw.length < 3 || tw.length < 3) continue;
+        // Check if words share enough characters at the start
+        if (sw.startsWith(tw.slice(0, Math.max(3, Math.floor(tw.length * 0.6))))) return true;
+        if (tw.startsWith(sw.slice(0, Math.max(3, Math.floor(sw.length * 0.6))))) return true;
+        // Levenshtein-style: allow 1 error per 4 chars
+        if (levenshtein(sw, tw) <= Math.floor(Math.max(sw.length, tw.length) / 4)) return true;
+      }
+    }
+    return false;
+  }
+
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({length:m+1}, (_,i) => Array.from({length:n+1}, (_,j) => i===0?j:j===0?i:0));
+    for (let i=1;i<=m;i++) for (let j=1;j<=n;j++)
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);
+    return dp[m][n];
+  }
+
   function findMatch(text) {
     const q = text.toLowerCase();
-    return allItems.find(({ item, category }) =>
-      q.includes(item.name.toLowerCase()) ||
-      q.includes(category.label.toLowerCase())
-    );
+    // Score each item — higher score = better match
+    let best = null;
+    let bestScore = 0;
+    allItems.forEach(({ item, category }) => {
+      const targets = [
+        item.name,
+        category.label,
+        // Also try without common words like "I Want to"
+        ...item.name.split(" "),
+        ...category.label.split(" "),
+      ];
+      for (const t of targets) {
+        if (t.length < 2) continue;
+        if (fuzzyMatch(q, t)) {
+          const score = t.length; // longer match = more specific = higher priority
+          if (score > bestScore) { best = { item, category }; bestScore = score; }
+        }
+      }
+    });
+    return best;
   }
 
   function startListening() {
@@ -1527,7 +1574,12 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
       const texts = results.flatMap(r => Array.from(r)).map(r => r.transcript);
       const combined = texts.join(" ");
       setTranscript(combined);
-      const match = texts.map(t => findMatch(t)).find(Boolean);
+      setDebug(texts);
+      let match = null;
+      for (const t of texts) {
+        match = findMatch(t);
+        if (match) break;
+      }
       if (match) setMatched(match);
     };
     recog.onend = () => {
@@ -1634,6 +1686,16 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
             background:"transparent", color:"#fff", fontSize:15, fontWeight:700,
             fontFamily:"'Nunito',sans-serif", cursor:"pointer",
           }}>🔄 Try Again</button>
+        </div>
+      )}
+
+      {/* Debug panel — shows all heard alternatives */}
+      {debug.length > 0 && !matched && (
+        <div style={{ background:"rgba(0,0,0,0.3)", borderRadius:12, padding:"10px 16px", marginBottom:16, width:"100%", maxWidth:360 }}>
+          <div style={{ color:"rgba(255,255,255,0.6)", fontSize:11, fontFamily:"'Nunito',sans-serif", marginBottom:6 }}>I heard these alternatives:</div>
+          {debug.map((t,i) => (
+            <div key={i} style={{ color:"#fff", fontSize:13, fontFamily:"'Nunito',sans-serif", fontWeight:600 }}>• "{t}"</div>
+          ))}
         </div>
       )}
 
