@@ -183,7 +183,7 @@ const BLOB_PATHS = [
 ];
 
 // ─── Blob Card (item button) ──────────────────────────────────────────────────
-function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, onDelete, parentMode, onOpenMenu, onManageMenu }) {
+function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, onDelete, parentMode, onOpenMenu, onManageMenu, onSchedule }) {
   const [squish, setSquish] = useState(false);
   const blobPath = BLOB_PATHS[index % BLOB_PATHS.length];
   const uid = `bc_${item.id}`;
@@ -303,8 +303,14 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
       )}
 
       {parentMode && (
-        <div style={{ display:"flex", gap:5, marginTop:5 }}>
+        <div style={{ display:"flex", gap:5, marginTop:5, flexWrap:"wrap", justifyContent:"center" }}>
+          {!isAvailable(item) && (
+            <span style={{ fontSize:10, background:"#FEF3C7", color:"#92400E", borderRadius:6, padding:"2px 6px", fontFamily:"'Nunito',sans-serif", fontWeight:700 }}>
+              {item.disabled ? "🚫 Off" : item.timeStart ? "⏰ Time" : "📅 Season"}
+            </span>
+          )}
           <button onClick={()=>onEdit(item)} style={{ background:color,border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>✏️</button>
+          <button onClick={()=>onSchedule(item)} style={{ background:"#F59E0B",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>⏰</button>
           <button onClick={()=>onManageMenu(item)} style={{ background:"#10B981",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>🍽️</button>
           <button onClick={()=>onDelete(item.id)} style={{ background:"#EF4444",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:13,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>🗑️</button>
         </div>
@@ -700,7 +706,47 @@ function PinModal({ title, onSuccess, onClose, correctPin }) {
 }
 
 // ─── Category Screen ──────────────────────────────────────────────────────────
-// ─── Restaurant Order Screen (Logan's flow: food → drink → speak) ────────────
+// ─── Availability checker ─────────────────────────────────────────────────────
+function isAvailable(item) {
+  if (!item) return true;
+  // Quick disabled
+  if (item.disabled) return false;
+
+  const now = new Date();
+  const month = now.getMonth() + 1; // 1-12
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const currentMins = hours * 60 + minutes;
+
+  // Time of day restriction
+  if (item.timeStart !== undefined && item.timeEnd !== undefined) {
+    const [sh, sm] = item.timeStart.split(":").map(Number);
+    const [eh, em] = item.timeEnd.split(":").map(Number);
+    const startMins = sh * 60 + sm;
+    const endMins = eh * 60 + em;
+    if (startMins <= endMins) {
+      // Normal range e.g. 11:00 - 19:00
+      if (currentMins < startMins || currentMins > endMins) return false;
+    } else {
+      // Overnight range e.g. 19:00 - 11:00 next day
+      if (currentMins < startMins && currentMins > endMins) return false;
+    }
+  }
+
+  // Seasonal/month restriction
+  if (item.monthStart !== undefined && item.monthEnd !== undefined) {
+    const s = item.monthStart;
+    const e = item.monthEnd;
+    if (s <= e) {
+      if (month < s || month > e) return false;
+    } else {
+      // Wraps year e.g. Oct(10) - Apr(4)
+      if (month < s && month > e) return false;
+    }
+  }
+
+  return true;
+}
 function RestaurantOrderScreen({ item, color, dark, light, onBack, onComplete }) {
   const [step, setStep] = useState("food"); // food | drink
   const [selectedFood, setSelectedFood] = useState(null);
@@ -869,6 +915,151 @@ function SubMenuEditScreen({ item, color, onBack, onSave }) {
   );
 }
 
+// ─── Schedule Modal ───────────────────────────────────────────────────────────
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function ScheduleModal({ item, color, onSave, onClose }) {
+  const [disabled, setDisabled] = useState(item.disabled || false);
+  const [useTime, setUseTime] = useState(item.timeStart !== undefined);
+  const [timeStart, setTimeStart] = useState(item.timeStart || "08:00");
+  const [timeEnd, setTimeEnd] = useState(item.timeEnd || "20:00");
+  const [useMonth, setUseMonth] = useState(item.monthStart !== undefined);
+  const [monthStart, setMonthStart] = useState(item.monthStart || 5);
+  const [monthEnd, setMonthEnd] = useState(item.monthEnd || 9);
+
+  function handleSave() {
+    const updated = { ...item, disabled };
+    if (useTime) { updated.timeStart = timeStart; updated.timeEnd = timeEnd; }
+    else { delete updated.timeStart; delete updated.timeEnd; }
+    if (useMonth) { updated.monthStart = monthStart; updated.monthEnd = monthEnd; }
+    else { delete updated.monthStart; delete updated.monthEnd; }
+    onSave(updated);
+    onClose();
+  }
+
+  const available = isAvailable({ disabled, 
+    timeStart: useTime ? timeStart : undefined, 
+    timeEnd: useTime ? timeEnd : undefined,
+    monthStart: useMonth ? monthStart : undefined,
+    monthEnd: useMonth ? monthEnd : undefined,
+  });
+
+  return (
+    <div style={{ position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.62)",display:"flex",alignItems:"center",justifyContent:"center",padding:16 }}>
+      <div style={{ background:"#fff",borderRadius:24,width:"100%",maxWidth:400,boxShadow:"0 20px 60px rgba(0,0,0,0.35)",maxHeight:"90vh",overflowY:"auto" }}>
+        {/* Header */}
+        <div style={{ background:color,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",borderRadius:"24px 24px 0 0",position:"sticky",top:0 }}>
+          <span style={{ color:"#fff",fontSize:17,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>⏰ Availability: {item.name}</span>
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.3)",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:16,color:"#fff" }}>✕</button>
+        </div>
+
+        <div style={{ padding:20 }}>
+          {/* Current status */}
+          <div style={{ background:available?"#f0fdf4":"#fef2f2",borderRadius:14,padding:"10px 16px",marginBottom:18,display:"flex",alignItems:"center",gap:10 }}>
+            <span style={{ fontSize:20 }}>{available?"✅":"🚫"}</span>
+            <span style={{ fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:14,color:available?"#15803d":"#dc2626" }}>
+              Currently {available ? "visible to Logan" : "hidden from Logan"}
+            </span>
+          </div>
+
+          {/* Quick disable */}
+          <div style={{ background:"#f9fafb",borderRadius:14,padding:"14px 16px",marginBottom:16 }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
+              <div>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:"#1a1a2e" }}>🚫 Quick Disable</div>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999",marginTop:2 }}>Hide immediately, re-enable anytime</div>
+              </div>
+              <button onClick={()=>setDisabled(!disabled)} style={{
+                width:52,height:28,borderRadius:14,border:"none",cursor:"pointer",
+                background:disabled?"#EF4444":"#e0e0e0",transition:"background 0.2s",
+                position:"relative",
+              }}>
+                <div style={{ width:22,height:22,borderRadius:"50%",background:"#fff",position:"absolute",top:3,transition:"left 0.2s",left:disabled?26:4 }} />
+              </button>
+            </div>
+          </div>
+
+          {/* Time of day */}
+          <div style={{ background:"#f9fafb",borderRadius:14,padding:"14px 16px",marginBottom:16 }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:useTime?14:0 }}>
+              <div>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:"#1a1a2e" }}>⏰ Time of Day</div>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999",marginTop:2 }}>Only show during certain hours</div>
+              </div>
+              <button onClick={()=>setUseTime(!useTime)} style={{
+                width:52,height:28,borderRadius:14,border:"none",cursor:"pointer",
+                background:useTime?color:"#e0e0e0",transition:"background 0.2s",position:"relative",
+              }}>
+                <div style={{ width:22,height:22,borderRadius:"50%",background:"#fff",position:"absolute",top:3,transition:"left 0.2s",left:useTime?26:4 }} />
+              </button>
+            </div>
+            {useTime && (
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
+                <div>
+                  <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#666",marginBottom:6,fontWeight:700 }}>Show from</div>
+                  <input type="time" value={timeStart} onChange={e=>setTimeStart(e.target.value)}
+                    style={{ width:"100%",padding:"10px 12px",borderRadius:10,border:"2px solid #e0e0e0",fontSize:15,fontFamily:"'Nunito',sans-serif",outline:"none",boxSizing:"border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#666",marginBottom:6,fontWeight:700 }}>Hide after</div>
+                  <input type="time" value={timeEnd} onChange={e=>setTimeEnd(e.target.value)}
+                    style={{ width:"100%",padding:"10px 12px",borderRadius:10,border:"2px solid #e0e0e0",fontSize:15,fontFamily:"'Nunito',sans-serif",outline:"none",boxSizing:"border-box" }} />
+                </div>
+                <div style={{ gridColumn:"1/-1",fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>
+                  Shows {timeStart} – {timeEnd} every day
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Seasonal */}
+          <div style={{ background:"#f9fafb",borderRadius:14,padding:"14px 16px",marginBottom:20 }}>
+            <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:useMonth?14:0 }}>
+              <div>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:14,color:"#1a1a2e" }}>📅 Seasonal</div>
+                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999",marginTop:2 }}>Only show certain months of the year</div>
+              </div>
+              <button onClick={()=>setUseMonth(!useMonth)} style={{
+                width:52,height:28,borderRadius:14,border:"none",cursor:"pointer",
+                background:useMonth?color:"#e0e0e0",transition:"background 0.2s",position:"relative",
+              }}>
+                <div style={{ width:22,height:22,borderRadius:"50%",background:"#fff",position:"absolute",top:3,transition:"left 0.2s",left:useMonth?26:4 }} />
+              </button>
+            </div>
+            {useMonth && (
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
+                <div>
+                  <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#666",marginBottom:6,fontWeight:700 }}>Show from</div>
+                  <select value={monthStart} onChange={e=>setMonthStart(Number(e.target.value))}
+                    style={{ width:"100%",padding:"10px 12px",borderRadius:10,border:"2px solid #e0e0e0",fontSize:15,fontFamily:"'Nunito',sans-serif",outline:"none" }}>
+                    {MONTHS.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#666",marginBottom:6,fontWeight:700 }}>Hide after</div>
+                  <select value={monthEnd} onChange={e=>setMonthEnd(Number(e.target.value))}
+                    style={{ width:"100%",padding:"10px 12px",borderRadius:10,border:"2px solid #e0e0e0",fontSize:15,fontFamily:"'Nunito',sans-serif",outline:"none" }}>
+                    {MONTHS.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+                  </select>
+                </div>
+                <div style={{ gridColumn:"1/-1",fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>
+                  Shows {MONTHS[monthStart-1]} – {MONTHS[monthEnd-1]} every year
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button onClick={handleSave} style={{
+            width:"100%",padding:14,borderRadius:14,border:"none",
+            background:color,color:"#fff",fontSize:17,fontWeight:800,
+            fontFamily:"'Nunito',sans-serif",cursor:"pointer",
+          }}>✅ Save Schedule</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
   const [items, setItems] = useState(category.items);
   const [search, setSearch] = useState("");
@@ -878,6 +1069,7 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
   const [confetti, setConfetti] = useState(false);
   const [orderItem, setOrderItem] = useState(null);
   const [manageMenuItem, setManageMenuItem] = useState(null);
+  const [scheduleItem, setScheduleItem] = useState(null);
 
   function handleSaveSubMenu(updatedItem) {
     persist(items.map(i => i.id===updatedItem.id ? updatedItem : i));
@@ -889,7 +1081,9 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
     handleSpeak(phrase);
   }
 
-  const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = items
+    .filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(i => parentMode || isAvailable(i));
 
   function persist(updated) {
     setItems(updated);
@@ -967,6 +1161,11 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
         <PhotoPickerModal title="Add New Item" color={category.color}
           onSave={d=>{ handleSaveItem(d); setShowAdd(false); }} onClose={()=>setShowAdd(false)} />
       )}
+      {scheduleItem && (
+        <ScheduleModal item={scheduleItem} color={category.color}
+          onSave={updated => { persist(items.map(i => i.id===updated.id ? updated : i)); }}
+          onClose={()=>setScheduleItem(null)} />
+      )}
       {editItem && (
         <PhotoPickerModal title={`Edit: ${editItem.name}`} color={category.color} initialName={editItem.name}
           onSave={handleEditItem} onClose={()=>setEditItem(null)} />
@@ -1008,7 +1207,7 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
           <BlobCard key={item.id} item={item} phrase={category.phrase}
             color={category.color} dark={category.dark} light={category.light}
             index={i} onSpeak={handleSpeak} onEdit={setEditItem} onDelete={handleDelete} parentMode={parentMode}
-            onOpenMenu={setOrderItem} onManageMenu={setManageMenuItem} />
+            onOpenMenu={setOrderItem} onManageMenu={setManageMenuItem} onSchedule={setScheduleItem} />
         ))}
         {/* Always-visible camera blob */}
         <CameraBlobCard color={category.color} dark={category.dark} light={category.light}
@@ -1023,6 +1222,7 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
   const [showCatPhoto, setShowCatPhoto] = useState(null);
   const [showEditCat, setShowEditCat] = useState(null);
   const [showAddCat, setShowAddCat] = useState(false);
+  const [scheduleCat, setScheduleCat] = useState(null);
 
   function handleCatEdit(updatedCat) {
     onUpdateCategories(categories.map(c => c.id===updatedCat.id ? updatedCat : c));
@@ -1096,6 +1296,11 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
       {showEditCat && (
         <EditCategoryModal cat={showEditCat} onSave={handleCatEdit} onClose={()=>setShowEditCat(null)} />
       )}
+      {scheduleCat && (
+        <ScheduleModal item={scheduleCat} color={scheduleCat.color || "#667eea"}
+          onSave={updated => { onUpdateCategories(categories.map(c => c.id===updated.id ? updated : c)); setScheduleCat(null); }}
+          onClose={()=>setScheduleCat(null)} />
+      )}
       <div style={{ background:"linear-gradient(135deg,#667eea,#764ba2)",padding:"16px 20px",display:"flex",alignItems:"center",gap:14 }}>
         <button onClick={onBack} style={{ background:"rgba(255,255,255,0.25)",border:"none",borderRadius:12,width:44,height:44,cursor:"pointer",fontSize:22,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center" }}>←</button>
         <div style={{ color:"#fff",fontSize:20,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>⚙️ Parent Settings</div>
@@ -1104,18 +1309,28 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
         <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:16,color:"#1a1a2e",marginBottom:12 }}>Categories</div>
         <div style={{ display:"flex",flexDirection:"column",gap:12,marginBottom:20 }}>
           {categories.map(cat=>(
-            <div key={cat.id} style={{ background:"#fff",borderRadius:18,padding:"14px 16px",display:"flex",alignItems:"center",gap:14,boxShadow:"0 3px 12px rgba(0,0,0,0.07)" }}>
-              <div style={{ width:52,height:52,borderRadius:12,overflow:"hidden",background:cat.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                {cat.photo ? <img src={cat.photo} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:28 }}>{cat.emoji}</span>}
-              </div>
-              <div style={{ flex:1,minWidth:0 }}>
-                <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:15,color:"#1a1a2e",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{cat.label}</div>
-                <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>{cat.items.length} items · "{cat.phrase}"</div>
-              </div>
-              <div style={{ display:"flex",gap:8 }}>
-                <button onClick={()=>setShowEditCat(cat)} style={{ background:"#667eea",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>✏️</button>
-                <button onClick={()=>setShowCatPhoto(cat.id)} style={{ background:cat.color,border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>📷</button>
-                <button onClick={()=>handleDeleteCat(cat.id)} style={{ background:"#fee2e2",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#EF4444",fontWeight:700 }}>🗑️</button>
+            <div key={cat.id} style={{ background:"#fff",borderRadius:18,padding:"14px 16px",boxShadow:"0 3px 12px rgba(0,0,0,0.07)" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:14 }}>
+                <div style={{ width:52,height:52,borderRadius:12,overflow:"hidden",background:cat.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                  {cat.photo ? <img src={cat.photo} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : <span style={{ fontSize:28 }}>{cat.emoji}</span>}
+                </div>
+                <div style={{ flex:1,minWidth:0 }}>
+                  <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+                    <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:15,color:"#1a1a2e",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{cat.label}</div>
+                    {!isAvailable(cat) && (
+                      <span style={{ fontSize:10,background:"#FEF3C7",color:"#92400E",borderRadius:6,padding:"2px 6px",fontFamily:"'Nunito',sans-serif",fontWeight:700,flexShrink:0 }}>
+                        {cat.disabled?"🚫 Off":cat.timeStart?"⏰":"📅"}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999" }}>{cat.items.length} items · "{cat.phrase}"</div>
+                </div>
+                <div style={{ display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end" }}>
+                  <button onClick={()=>setShowEditCat(cat)} style={{ background:"#667eea",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>✏️</button>
+                  <button onClick={()=>setScheduleCat(cat)} style={{ background:"#F59E0B",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>⏰</button>
+                  <button onClick={()=>setShowCatPhoto(cat.id)} style={{ background:cat.color,border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#fff",fontWeight:700 }}>📷</button>
+                  <button onClick={()=>handleDeleteCat(cat.id)} style={{ background:"#fee2e2",border:"none",borderRadius:10,padding:"7px 10px",cursor:"pointer",fontSize:14,color:"#EF4444",fontWeight:700 }}>🗑️</button>
+                </div>
               </div>
             </div>
           ))}
@@ -1781,7 +1996,6 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
 
       {/* Mic button */}
       {matched.length === 0 && (
-      {!matched && (
         <button onClick={startListening} disabled={listening} style={{
           width:120, height:120, borderRadius:"50%", border:"none",
           background:listening ? "#EF4444" : "rgba(255,255,255,0.95)",
@@ -2001,6 +2215,7 @@ export default function MyVoiceApp() {
                     onDelete={()=>{}}
                     onOpenMenu={()=>{}}
                     onManageMenu={()=>{}}
+                    onSchedule={()=>{}}
                     parentMode={false}
                   />
                   <div style={{ fontSize:10, color:"#aaa", fontFamily:"'Nunito',sans-serif", marginTop:2 }}>{category.label}</div>
@@ -2011,11 +2226,13 @@ export default function MyVoiceApp() {
                 </div>
               )
             ) : (
-              data.categories.map((cat,i) => (
-                <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode}
-                  onClick={()=>{ setActiveCategory(cat); setScreen("category"); }}
-                />
-              ))
+              data.categories
+                .filter(cat => parentMode || isAvailable(cat))
+                .map((cat,i) => (
+                  <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode}
+                    onClick={()=>{ setActiveCategory(cat); setScreen("category"); }}
+                  />
+                ))
             )}
           </div>
         </div>
