@@ -109,6 +109,77 @@ const SEED_CATEGORIES = [
 // ─── Storage (Firestore + Firebase Storage for photos) ───────────────────────
 const SEED_DATA = { categories: SEED_CATEGORIES, parentPin: "1234" };
 
+// School Mode seed data — school-appropriate categories only
+const SCHOOL_SEED_CATEGORIES = [
+  {
+    id:"school_need", label:"I Need", emoji:"🤚", photo:null,
+    color:"#EF4444", dark:"#B91C1C", light:"#FCA5A5", phrase:"I need",
+    items:[
+      {id:"sn1",name:"Bathroom",emoji:"🚻",photo:null},
+      {id:"sn2",name:"Water",emoji:"💧",photo:null},
+      {id:"sn3",name:"Help",emoji:"🆘",photo:null},
+      {id:"sn4",name:"Break",emoji:"⏸️",photo:null},
+      {id:"sn5",name:"Nurse",emoji:"🏥",photo:null},
+    ],
+  },
+  {
+    id:"school_feel", label:"I Feel", emoji:"💛", photo:null,
+    color:"#F59E0B", dark:"#C2701A", light:"#FFAA85", phrase:"I feel",
+    items:[
+      {id:"sf1",name:"Happy",emoji:"😄",photo:null},
+      {id:"sf2",name:"Sad",emoji:"😢",photo:null},
+      {id:"sf3",name:"Tired",emoji:"😴",photo:null},
+      {id:"sf4",name:"Frustrated",emoji:"😤",photo:null},
+      {id:"sf5",name:"Sick",emoji:"🤒",photo:null},
+    ],
+  },
+  {
+    id:"school_do", label:"I Want to Do", emoji:"⭐", photo:null,
+    color:"#A855F7", dark:"#7C3AED", light:"#D8B4FE", phrase:"I want to",
+    items:[
+      {id:"sd1",name:"Read",emoji:"📖",photo:null},
+      {id:"sd2",name:"Draw",emoji:"🎨",photo:null},
+      {id:"sd3",name:"Play",emoji:"🧩",photo:null},
+      {id:"sd4",name:"Recess",emoji:"🏃",photo:null},
+      {id:"sd5",name:"Computer",emoji:"💻",photo:null},
+    ],
+  },
+  {
+    id:"school_yesno", label:"Yes/No", emoji:"✅", photo:null,
+    color:"#10B981", dark:"#047857", light:"#6EE7B7", phrase:"",
+    items:[
+      {id:"sy1",name:"Yes",emoji:"✅",photo:null},
+      {id:"sy2",name:"No",emoji:"❌",photo:null},
+      {id:"sy3",name:"Maybe",emoji:"🤷",photo:null},
+    ],
+  },
+];
+
+const SCHOOL_SEED_DATA = { categories: SCHOOL_SEED_CATEGORIES, parentPin: "1234" };
+
+// ─── Mode & Local Storage Helpers ─────────────────────────────────────────────
+const MODE_KEY = "myvoice_device_mode"; // "home" or "school" — stays on THIS device only
+const SCHOOL_DATA_KEY = "myvoice_school_data"; // local copy of school mode data + photos
+
+function getDeviceMode() {
+  try { return localStorage.getItem(MODE_KEY) || null; } catch { return null; }
+}
+
+function setDeviceMode(mode) {
+  try { localStorage.setItem(MODE_KEY, mode); } catch {}
+}
+
+function loadSchoolDataLocal() {
+  try {
+    const s = localStorage.getItem(SCHOOL_DATA_KEY);
+    return s ? JSON.parse(s) : SCHOOL_SEED_DATA;
+  } catch { return SCHOOL_SEED_DATA; }
+}
+
+function saveSchoolDataLocal(data) {
+  try { localStorage.setItem(SCHOOL_DATA_KEY, JSON.stringify(data)); } catch(e) { console.error("Local save error:", e); }
+}
+
 function stripPhotos(categories) {
   return categories.map(cat => ({
     ...cat,
@@ -214,11 +285,12 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
 
     const full = phrase ? `${phrase} ${item.name}` : item.name;
     speak(full);
-    onSpeak(full);
 
     // Check item's own appLink first, then check name against deep link map
     const nameKey = item.name.toLowerCase().trim();
     const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
+
+    onSpeak(full, !!deepLink); // pass isAppItem = true if it has a deep link
 
     if (deepLink) {
       const start = Date.now();
@@ -412,6 +484,11 @@ function HomeBlobCard({ cat, onClick, parentMode, index }) {
         lineHeight:1.2, maxWidth:160, marginTop:6,
       }}>{cat.label}</span>
       <span style={{ fontSize:11, color:"#aaa", fontFamily:"'Nunito',sans-serif", marginTop:2 }}>{cat.items.length} items</span>
+      {parentMode && !isAvailable(cat) && (
+        <span style={{ fontSize:10, background:"#FEF3C7", color:"#92400E", borderRadius:6, padding:"2px 8px", fontFamily:"'Nunito',sans-serif", fontWeight:700, marginTop:2 }}>
+          {cat.disabled ? "🚫 Off" : cat.timeStart ? "⏰ Time" : "📅 Season"}
+        </span>
+      )}
     </div>
   );
 }
@@ -1060,7 +1137,7 @@ function ScheduleModal({ item, color, onSave, onClose }) {
   );
 }
 
-function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
+function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpoken }) {
   const [items, setItems] = useState(category.items);
   const [search, setSearch] = useState("");
   const [lastSpoken, setLastSpoken] = useState("");
@@ -1122,7 +1199,7 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
     persist(items.filter(i=>i.id!==id));
   }
 
-  function handleSpeak(text) {
+  function handleSpeak(text, isAppItem = false) {
     setLastSpoken(text);
     setConfetti(true);
     setTimeout(()=>setConfetti(false), 1600);
@@ -1134,6 +1211,8 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text }),
     }).catch(e => console.error("Notify error:", e));
+    // Update last request bar (not for app-opening items like YouTube)
+    if (!isAppItem && onSpoken) onSpoken(text);
     // Navigate back to home screen after a short delay so he sees the confetti
     setTimeout(() => onBack(), 2000);
   }
@@ -1218,7 +1297,7 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode }) {
 }
 
 // ─── Settings Screen ──────────────────────────────────────────────────────────
-function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, currentPin }) {
+function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, currentPin, deviceMode, onSwitchMode }) {
   const [showCatPhoto, setShowCatPhoto] = useState(null);
   const [showEditCat, setShowEditCat] = useState(null);
   const [showAddCat, setShowAddCat] = useState(false);
@@ -1372,6 +1451,25 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
             style={{ width:"100%",padding:"10px 14px",borderRadius:12,border:"2px solid #e0e0e0",fontSize:18,fontFamily:"'Nunito',sans-serif",fontWeight:800,outline:"none",boxSizing:"border-box",letterSpacing:8,marginBottom:10 }} />
           <button onClick={handlePinChange} style={{ width:"100%",padding:12,borderRadius:12,border:"none",background:"#667eea",color:"#fff",fontFamily:"'Nunito',sans-serif",fontWeight:800,cursor:"pointer",fontSize:15 }}>Update PIN</button>
           {pinMsg && <div style={{ textAlign:"center",marginTop:8,fontFamily:"'Nunito',sans-serif",color:pinMsg.startsWith("✅")?"#10B981":"#EF4444",fontWeight:700 }}>{pinMsg}</div>}
+        </div>
+
+        <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:16,color:"#1a1a2e",margin:"24px 0 12px" }}>This Device</div>
+        <div style={{ background:"#fff",borderRadius:18,padding:18,boxShadow:"0 3px 12px rgba(0,0,0,0.07)" }}>
+          <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:14,color:"#1a1a2e",marginBottom:4,fontWeight:700 }}>
+            Currently in: {deviceMode === "school" ? "🎒 School Mode" : "🏠 Home Mode"}
+          </div>
+          <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999",marginBottom:14 }}>
+            {deviceMode === "school"
+              ? "Data is stored on this device only and works offline."
+              : "Data syncs to the cloud and across devices in Home Mode."}
+          </div>
+          <button onClick={onSwitchMode} style={{
+            width:"100%",padding:12,borderRadius:12,border:"2px solid #EF4444",
+            background:"transparent",color:"#EF4444",fontFamily:"'Nunito',sans-serif",
+            fontWeight:800,cursor:"pointer",fontSize:14,
+          }}>
+            🔄 Switch to {deviceMode === "school" ? "Home" : "School"} Mode
+          </button>
         </div>
       </div>
     </div>
@@ -2017,8 +2115,52 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
   );
 }
 
+// ─── Mode Selector (shown once per device) ────────────────────────────────────
+function ModeSelectorScreen({ onSelect }) {
+  return (
+    <div style={{ minHeight:"100vh", background:"linear-gradient(135deg,#667eea,#764ba2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:24 }}>
+      <div style={{ fontSize:52, marginBottom:12 }}>🗣️</div>
+      <div style={{ color:"#fff", fontSize:28, fontWeight:900, fontFamily:"'Nunito',sans-serif", marginBottom:6 }}>My Voice</div>
+      <div style={{ color:"rgba(255,255,255,0.85)", fontSize:15, fontFamily:"'Nunito',sans-serif", marginBottom:40, textAlign:"center", maxWidth:300 }}>
+        Which version should this device use?
+      </div>
+
+      <button onClick={()=>onSelect("home")} style={{
+        width:"100%", maxWidth:320, padding:"20px 24px", borderRadius:20, border:"none",
+        background:"#fff", cursor:"pointer", marginBottom:16,
+        display:"flex", alignItems:"center", gap:16, textAlign:"left",
+        boxShadow:"0 8px 24px rgba(0,0,0,0.2)",
+      }}>
+        <span style={{ fontSize:40 }}>🏠</span>
+        <div>
+          <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18, color:"#1a1a2e" }}>Home Mode</div>
+          <div style={{ fontFamily:"'Nunito',sans-serif", fontSize:13, color:"#888" }}>Full app — restaurants, videos, music</div>
+        </div>
+      </button>
+
+      <button onClick={()=>onSelect("school")} style={{
+        width:"100%", maxWidth:320, padding:"20px 24px", borderRadius:20, border:"none",
+        background:"#fff", cursor:"pointer",
+        display:"flex", alignItems:"center", gap:16, textAlign:"left",
+        boxShadow:"0 8px 24px rgba(0,0,0,0.2)",
+      }}>
+        <span style={{ fontSize:40 }}>🎒</span>
+        <div>
+          <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18, color:"#1a1a2e" }}>School Mode</div>
+          <div style={{ fontFamily:"'Nunito',sans-serif", fontSize:13, color:"#888" }}>Offline-friendly — school essentials</div>
+        </div>
+      </button>
+
+      <div style={{ color:"rgba(255,255,255,0.6)", fontSize:12, fontFamily:"'Nunito',sans-serif", marginTop:32, textAlign:"center", maxWidth:280 }}>
+        This choice is saved on this device only. You can change it later in Settings.
+      </div>
+    </div>
+  );
+}
+
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function MyVoiceApp() {
+  const [deviceMode, setDeviceModeState] = useState(null); // null = not chosen yet, "home" or "school"
   const [data, setData] = useState(SEED_DATA);
   const [loaded, setLoaded] = useState(false);
   const [screen, setScreen] = useState("home");
@@ -2030,15 +2172,51 @@ export default function MyVoiceApp() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [lastRequest, setLastRequest] = useState(() => {
+    try { return localStorage.getItem("myvoice_last_request") || ""; } catch { return ""; }
+  });
+
+  function updateLastRequest(text) {
+    setLastRequest(text);
+    try { localStorage.setItem("myvoice_last_request", text); } catch {}
+  }
+
+  function clearLastRequest() {
+    setLastRequest("");
+    try { localStorage.removeItem("myvoice_last_request"); } catch {}
+  }
+
+  // Check for saved device mode on mount
+  useEffect(() => {
+    const saved = getDeviceMode();
+    if (saved) setDeviceModeState(saved);
+  }, []);
+
+  function handleSelectMode(mode) {
+    setDeviceMode(mode);
+    setDeviceModeState(mode);
+  }
 
   useEffect(() => {
+    if (!deviceMode) return; // wait until mode is chosen
+
     const link = document.createElement("link");
     link.rel = "stylesheet"; link.href = FONT_LINK;
     document.head.appendChild(link);
+
+    if (deviceMode === "school") {
+      // School Mode — load from local storage only, fully offline
+      const d = loadSchoolDataLocal();
+      setData(d);
+      setLoaded(true);
+      if (d.voiceMode) setVoiceMode(true);
+      return; // no Supabase subscription needed for school mode (Phase 1)
+    }
+
+    // Home Mode — load from Firestore as before
     loadFromFirestore(SEED_DATA).then(d => {
       setData(d);
       setLoaded(true);
-      // Restore voice mode from saved data
       if (d.voiceMode) setVoiceMode(true);
     });
     const sub = subscribeToMessages(msg => {
@@ -2049,7 +2227,7 @@ export default function MyVoiceApp() {
       }
     });
     return () => sub?.unsubscribe?.();
-  }, []);
+  }, [deviceMode]);
 
   // Global search across all categories
   useEffect(() => {
@@ -2066,7 +2244,14 @@ export default function MyVoiceApp() {
     setSearchResults(results);
   }, [globalSearch, data.categories]);
 
-  function persist(updated) { setData(updated); saveData(updated); }
+  function persist(updated) {
+    setData(updated);
+    if (deviceMode === "school") {
+      saveSchoolDataLocal(updated); // local only — Phase 1
+    } else {
+      saveData(updated); // Firestore as before
+    }
+  }
   function updateCategory(c) { persist({ ...data, categories:data.categories.map(x=>x.id===c.id?c:x) }); }
   function updateAllCategories(cats) { persist({ ...data, categories:cats }); }
 
@@ -2089,8 +2274,14 @@ export default function MyVoiceApp() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: full }),
     }).catch(e => console.error("Notify error:", e));
+    updateLastRequest(full);
     setGlobalSearch("");
     setSearchResults([]);
+  }
+
+  // Show mode selector if this device hasn't chosen a mode yet
+  if (!deviceMode) {
+    return <ModeSelectorScreen onSelect={handleSelectMode} />;
   }
 
   return (
@@ -2100,7 +2291,9 @@ export default function MyVoiceApp() {
         <div style={{ minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,background:"linear-gradient(135deg,#667eea,#764ba2)" }}>
           <div style={{ fontSize:52 }}>🗣️</div>
           <div style={{ color:"#fff",fontSize:22,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>My Voice</div>
-          <div style={{ color:"rgba(255,255,255,0.8)",fontSize:14,fontFamily:"'Nunito',sans-serif" }}>Loading...</div>
+          <div style={{ color:"rgba(255,255,255,0.8)",fontSize:14,fontFamily:"'Nunito',sans-serif" }}>
+            {deviceMode === "school" ? "Loading (offline ready)..." : "Loading..."}
+          </div>
         </div>
       )}
       {showPinModal && (
@@ -2115,6 +2308,7 @@ export default function MyVoiceApp() {
             speak(text);
             sendMessage(text);
             fetch("/api/notify", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message:text }) }).catch(()=>{});
+            updateLastRequest(text);
           }}
           onExit={()=>{
             setVoiceMode(false);
@@ -2133,6 +2327,11 @@ export default function MyVoiceApp() {
                 <div style={{ color:"rgba(255,255,255,0.8)",fontSize:13,fontFamily:"'Nunito',sans-serif",marginTop:3 }}>
                   {parentMode ? "✏️ Edit Mode" : "Tap a button to speak!"}
                 </div>
+                {deviceMode === "school" && (
+                  <div style={{ display:"inline-block", marginTop:4, background:"rgba(255,255,255,0.25)", borderRadius:8, padding:"2px 10px", color:"#fff", fontSize:11, fontWeight:800, fontFamily:"'Nunito',sans-serif" }}>
+                    🎒 School Mode {navigator.onLine ? "" : "(Offline)"}
+                  </div>
+                )}
               </div>
               <div style={{ display:"flex",flexDirection:"column",gap:8,alignItems:"flex-end" }}>
                 <button onClick={handleToggleParent} style={{
@@ -2152,7 +2351,7 @@ export default function MyVoiceApp() {
                   <button onClick={()=>{
                     const newMode = !voiceMode;
                     setVoiceMode(newMode);
-                    saveData({ ...data, voiceMode: newMode });
+                    persist({ ...data, voiceMode: newMode });
                   }} style={{
                     background:voiceMode?"#10B981":"rgba(255,255,255,0.22)",
                     border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",
@@ -2188,6 +2387,27 @@ export default function MyVoiceApp() {
               )}
             </div>
           </div>
+
+          {/* Last Request Bar */}
+          {lastRequest && (
+            <div style={{
+              background:"#1a1a2e", padding:"12px 20px",
+              display:"flex", alignItems:"center", justifyContent:"space-between", gap:12,
+            }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, flex:1, minWidth:0 }}>
+                <span style={{ fontSize:18, flexShrink:0 }}>🗣️</span>
+                <span style={{
+                  fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14,
+                  color:"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+                }}>"{lastRequest}"</span>
+              </div>
+              <button onClick={clearLastRequest} style={{
+                background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8,
+                padding:"4px 10px", cursor:"pointer", color:"#fff", fontSize:12,
+                fontFamily:"'Nunito',sans-serif", fontWeight:700, flexShrink:0,
+              }}>✕ Clear</button>
+            </div>
+          )}
 
           {/* Category Grid OR Search Results */}
           <div style={{ padding:"16px 10px 40px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, alignItems:"start" }}>
@@ -2242,7 +2462,8 @@ export default function MyVoiceApp() {
           category={data.categories.find(c=>c.id===activeCategory.id)||activeCategory}
           parentMode={parentMode}
           onBack={()=>setScreen("home")}
-          onUpdateCategory={updateCategory} />
+          onUpdateCategory={updateCategory}
+          onSpoken={updateLastRequest} />
       )}
       {loaded && screen==="choice" && (
         <ChoiceBoardScreen onBack={()=>setScreen("home")} />
@@ -2251,7 +2472,15 @@ export default function MyVoiceApp() {
         <SettingsScreen categories={data.categories} currentPin={data.parentPin}
           onUpdateCategories={updateAllCategories}
           onChangePin={pin=>persist({...data,parentPin:pin})}
-          onBack={()=>setScreen("home")} />
+          onBack={()=>setScreen("home")}
+          deviceMode={deviceMode}
+          onSwitchMode={()=>{
+            const newMode = deviceMode === "school" ? "home" : "school";
+            if (window.confirm(`Switch this device to ${newMode === "school" ? "School" : "Home"} Mode? The app will reload.`)) {
+              setDeviceMode(newMode);
+              window.location.reload();
+            }
+          }} />
       )}
     </div>
   );
