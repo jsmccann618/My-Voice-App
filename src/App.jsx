@@ -261,15 +261,16 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const hasMenu = item.subMenu?.food?.length > 0;
 
   // Auto deep link map — if item name matches, open the app
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const DEEP_LINKS = {
-    "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
-    "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
-    "amazon music":  { app: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune", web: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune" },
-    "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
-    "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
-    "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
-    "apple music":   { app: "music://",        web: "https://music.apple.com" },
-    "youtube kids":  { app: "youtubekids://",  web: "https://www.youtubekids.com" },
+    "youtube":      { app: isIOS ? "youtube://" : "https://www.youtube.com", web: "https://www.youtube.com" },
+    "disney+":      { app: isIOS ? "disneyplus://" : "https://www.disneyplus.com", web: "https://www.disneyplus.com" },
+    "amazon music": { app: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune", web: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune" },
+    "netflix":      { app: isIOS ? "nflx://" : "https://www.netflix.com", web: "https://www.netflix.com" },
+    "hulu":         { app: isIOS ? "hulu://" : "https://www.hulu.com", web: "https://www.hulu.com" },
+    "spotify":      { app: isIOS ? "spotify://" : "https://open.spotify.com", web: "https://open.spotify.com" },
+    "apple music":  { app: isIOS ? "music://" : "https://music.apple.com", web: "https://music.apple.com" },
+    "youtube kids": { app: isIOS ? "youtubekids://" : "https://www.youtubekids.com", web: "https://www.youtubekids.com" },
   };
 
   function handlePress() {
@@ -293,11 +294,15 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
     onSpeak(full, !!deepLink); // pass isAppItem = true if it has a deep link
 
     if (deepLink) {
-      const start = Date.now();
-      window.location = deepLink.app;
-      setTimeout(() => {
-        if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
-      }, 1500);
+      if (isIOS) {
+        const start = Date.now();
+        window.location = deepLink.app;
+        setTimeout(() => {
+          if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
+        }, 1500);
+      } else {
+        window.open(deepLink.app, "_blank");
+      }
     }
   }
 
@@ -1978,15 +1983,16 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
   }
 
   function getDeepLink(item) {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const DEEP_LINKS = {
-      "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
-      "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
-      "amazon music":  { app: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune", web: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune" },
-      "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
-      "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
-      "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
-      "apple music":   { app: "music://",        web: "https://music.apple.com" },
-      "youtube kids":  { app: "youtubekids://",  web: "https://www.youtubekids.com" },
+      "youtube":      { app: isIOS ? "youtube://" : "https://www.youtube.com", web: "https://www.youtube.com" },
+      "disney+":      { app: isIOS ? "disneyplus://" : "https://www.disneyplus.com", web: "https://www.disneyplus.com" },
+      "amazon music": { app: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune", web: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune" },
+      "netflix":      { app: isIOS ? "nflx://" : "https://www.netflix.com", web: "https://www.netflix.com" },
+      "hulu":         { app: isIOS ? "hulu://" : "https://www.hulu.com", web: "https://www.hulu.com" },
+      "spotify":      { app: isIOS ? "spotify://" : "https://open.spotify.com", web: "https://open.spotify.com" },
+      "apple music":  { app: isIOS ? "music://" : "https://music.apple.com", web: "https://music.apple.com" },
+      "youtube kids": { app: isIOS ? "youtubekids://" : "https://www.youtubekids.com", web: "https://www.youtubekids.com" },
     };
     const nameKey = item.name.toLowerCase().trim();
     return item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
@@ -2038,8 +2044,19 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
               return (
                 <a key={item.id} href={getDeepLink(item)?.app || "#"} 
                   onClick={(e)=>{
-                    if (!getDeepLink(item)) e.preventDefault();
+                    e.preventDefault();
                     handleSelect(item, category);
+                    const dl = getDeepLink(item);
+                    if (dl) {
+                      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                      if (isIOS) {
+                        const start = Date.now();
+                        window.location = dl.app;
+                        setTimeout(() => { if (Date.now() - start < 2000) window.open(dl.web, "_blank"); }, 1500);
+                      } else {
+                        window.open(dl.app, "_blank");
+                      }
+                    }
                   }}
                   style={{
                     background:"none", border:"none", cursor:"pointer", padding:0,
@@ -2047,10 +2064,6 @@ function VoiceActivatedScreen({ categories, parentPin, onSpeak, onExit }) {
                     filter:`drop-shadow(0 6px 16px ${category.dark}88)`,
                     textDecoration:"none",
                   }}>
-                  background:"none", border:"none", cursor:"pointer", padding:0,
-                  display:"flex", flexDirection:"column", alignItems:"center",
-                  filter:`drop-shadow(0 6px 16px ${category.dark}88)`,
-                }}>
                   <svg viewBox="0 0 100 100" style={{ width: matched.length===1?180:140, height:matched.length===1?180:140, display:"block", overflow:"visible" }}>
                     <defs>
                       <radialGradient id={`${uid2}_g`} cx="38%" cy="28%" r="65%">
