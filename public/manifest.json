@@ -3,24 +3,14 @@
   "short_name": "My Voice",
   "description": "AAC communication app for Logan",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#667eea",
   "theme_color": "#667eea",
-  "orientation": "portrait",
+  "orientation": "any",
   "icons": [
     {
       "src": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f5e3.png",
       "sizes": "72x72",
-      "type": "image/png"
-    },
-    {
-      "src": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f5e3.png",
-      "sizes": "96x96",
-      "type": "image/png"
-    },
-    {
-      "src": "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f5e3.png",
-      "sizes": "128x128",
       "type": "image/png"
     },
     {
