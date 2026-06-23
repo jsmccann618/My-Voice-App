@@ -260,17 +260,16 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const uid = `bc_${item.id}`;
   const hasMenu = item.subMenu?.food?.length > 0;
 
-  // Auto deep link map
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  // Auto deep link map — if item name matches, open the app
   const DEEP_LINKS = {
-    "youtube":      { app: isIOS ? "youtube://" : "https://www.youtube.com", web: "https://www.youtube.com" },
-    "disney+":      { app: isIOS ? "disneyplus://" : "https://www.disneyplus.com", web: "https://www.disneyplus.com" },
-    "amazon music": { app: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune", web: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune" },
-    "netflix":      { app: isIOS ? "nflx://" : "https://www.netflix.com", web: "https://www.netflix.com" },
-    "hulu":         { app: isIOS ? "hulu://" : "https://www.hulu.com", web: "https://www.hulu.com" },
-    "spotify":      { app: isIOS ? "spotify://" : "https://open.spotify.com", web: "https://open.spotify.com" },
-    "apple music":  { app: isIOS ? "music://" : "https://music.apple.com", web: "https://music.apple.com" },
-    "youtube kids": { app: isIOS ? "youtubekids://" : "https://www.youtubekids.com", web: "https://www.youtubekids.com" },
+    "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
+    "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
+    "amazon music":  { app: "https://music.amazon.com", web: "https://music.amazon.com" },
+    "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
+    "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
+    "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
+    "apple music":   { app: "music://",        web: "https://music.apple.com" },
+    "youtube kids":  { app: "youtubekids://",  web: "https://www.youtubekids.com" },
   };
 
   function handlePress() {
@@ -285,23 +284,17 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
 
     const full = phrase ? `${phrase} ${item.name}` : item.name;
     speak(full);
+    onSpeak(full, !!( item.appLink || DEEP_LINKS[item.name.toLowerCase().trim()] ));
 
+    // Check item's own appLink first, then check name against deep link map
     const nameKey = item.name.toLowerCase().trim();
     const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
 
-    onSpeak(full, !!deepLink);
-
     if (deepLink) {
-      if (isIOS) {
-        const start = Date.now();
-        window.location = deepLink.app;
-        setTimeout(() => {
-          if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
-        }, 1500);
-      } else {
-        // Android — navigate to https URL, browser handles app opening
-        window.location.href = deepLink.web;
-      }
+      window.location = deepLink.app;
+      setTimeout(() => {
+        window.open(deepLink.web, "_blank");
+      }, 2000);
     }
   }
 
