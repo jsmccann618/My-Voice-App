@@ -301,8 +301,14 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
           if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
         }, 1500);
       } else {
-        // Android — use location.href for universal links
-        window.location.href = deepLink.app;
+        // Android — create and click a real anchor tag
+        const a = document.createElement("a");
+        a.href = deepLink.app;
+        a.target = "_blank";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 500);
       }
     }
   }
