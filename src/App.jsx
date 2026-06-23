@@ -301,67 +301,86 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
           if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
         }, 1500);
       } else {
-        // Android — create and click a real anchor tag
-        const a = document.createElement("a");
-        a.href = deepLink.app;
-        a.target = "_blank";
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => document.body.removeChild(a), 500);
+        // Android — use intent URL to force open in Chrome browser
+        // which will then handle the universal link and open the app
+        const intentUrl = `intent:${deepLink.app.replace(/^https?:\/\//, '//')}#Intent;scheme=https;action=android.intent.action.VIEW;end`;
+        window.location.href = intentUrl;
       }
     }
   }
 
+  const nameKey = item.name.toLowerCase().trim();
+  const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
+  const isAndroid = !isIOS;
+  const blobContent = (
+    <>
+      <svg viewBox="0 0 100 100" style={{ width:150, height:150, display:"block", overflow:"visible" }}>
+        <defs>
+          <radialGradient id={`${uid}_g`} cx="38%" cy="30%" r="65%">
+            <stop offset="0%" stopColor={light} />
+            <stop offset="50%" stopColor={color} />
+            <stop offset="100%" stopColor={dark} />
+          </radialGradient>
+          <clipPath id={`${uid}_c`}><path d={blobPath} /></clipPath>
+        </defs>
+        <path d={blobPath} fill={`url(#${uid}_g)`} />
+        {item.logo && !item.photo && (
+          <path d={blobPath} fill="white" opacity="0.92" />
+        )}
+        {item.photo && (
+          <image href={item.photo} x="8" y="8" width="84" height="84"
+            clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid slice" opacity="0.9" />
+        )}
+        {item.logo && !item.photo && (
+          <image href={item.logo} x="12" y="12" width="76" height="76"
+            clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid meet" />
+        )}
+        {!item.photo && !item.logo && (
+          <text x="50" y="55" textAnchor="middle" dominantBaseline="middle"
+            fontSize="38" style={{ userSelect:"none", pointerEvents:"none" }}>{item.emoji}</text>
+        )}
+        <ellipse cx="36" cy="26" rx="14" ry="9" fill="white" opacity="0.28" transform="rotate(-20,36,26)" />
+        <ellipse cx="30" cy="22" rx="6" ry="3.5" fill="white" opacity="0.38" transform="rotate(-20,30,22)" />
+      </svg>
+    </>
+  );
+
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", position:"relative" }}>
-      <button onClick={handlePress} style={{
-        background:"none", border:"none",
-        cursor: parentMode ? "default" : "pointer",
-        padding: 0,
-        display:"flex", flexDirection:"column", alignItems:"center",
-        transform: squish ? "scale(1.08) scaleY(0.88)" : "scale(1)",
-        transition: "transform 0.18s cubic-bezier(0.34,1.56,0.64,1)",
-        filter: squish
-          ? `drop-shadow(0 0 12px ${color}88)`
-          : `drop-shadow(0 5px 10px ${dark}55)`,
-        width:"100%",
-      }}>
-        <svg viewBox="0 0 100 100" style={{ width:150, height:150, display:"block", overflow:"visible" }}>
-          <defs>
-            <radialGradient id={`${uid}_g`} cx="38%" cy="30%" r="65%">
-              <stop offset="0%" stopColor={light} />
-              <stop offset="50%" stopColor={color} />
-              <stop offset="100%" stopColor={dark} />
-            </radialGradient>
-            <clipPath id={`${uid}_c`}><path d={blobPath} /></clipPath>
-          </defs>
-          {/* Main blob */}
-          <path d={blobPath} fill={`url(#${uid}_g)`} />
-          {/* White backing for logos so they show clearly */}
-          {item.logo && !item.photo && (
-            <path d={blobPath} fill="white" opacity="0.92" />
-          )}
-          {/* Photo clipped inside */}
-          {item.photo && (
-            <image href={item.photo} x="8" y="8" width="84" height="84"
-              clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid slice" opacity="0.9" />
-          )}
-          {/* App logo clipped inside blob */}
-          {item.logo && !item.photo && (
-            <image href={item.logo} x="12" y="12" width="76" height="76"
-              clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid meet" />
-          )}
-          {/* Emoji fallback */}
-          {!item.photo && !item.logo && (
-            <text x="50" y="55" textAnchor="middle" dominantBaseline="middle"
-              fontSize="38" style={{ userSelect:"none", pointerEvents:"none" }}>{item.emoji}</text>
-          )}
-          {/* Gloss highlights */}
-          <ellipse cx="36" cy="26" rx="14" ry="9" fill="white" opacity="0.28" transform="rotate(-20,36,26)" />
-          <ellipse cx="30" cy="22" rx="6" ry="3.5" fill="white" opacity="0.38" transform="rotate(-20,30,22)" />
-        </svg>
-      </button>
+      {/* On Android with a deep link, use a real anchor tag for reliable app opening */}
+      {deepLink && isAndroid && !parentMode ? (
+        <a href={deepLink.app} style={{
+          background:"none", textDecoration:"none", padding:0,
+          display:"flex", flexDirection:"column", alignItems:"center",
+          transform: squish ? "scale(1.08) scaleY(0.88)" : "scale(1)",
+          transition:"transform 0.18s cubic-bezier(0.34,1.56,0.64,1)",
+          filter: squish ? `drop-shadow(0 0 12px ${color}88)` : `drop-shadow(0 5px 10px ${dark}55)`,
+          width:"100%",
+        }} onClick={()=>{
+          setSquish(true);
+          setTimeout(()=>setSquish(false), 300);
+          const full = phrase ? `${phrase} ${item.name}` : item.name;
+          speak(full);
+          onSpeak(full, true);
+        }}>
+          {blobContent}
+        </a>
+      ) : (
+        <button onClick={handlePress} style={{
+          background:"none", border:"none",
+          cursor: parentMode ? "default" : "pointer",
+          padding: 0,
+          display:"flex", flexDirection:"column", alignItems:"center",
+          transform: squish ? "scale(1.08) scaleY(0.88)" : "scale(1)",
+          transition: "transform 0.18s cubic-bezier(0.34,1.56,0.64,1)",
+          filter: squish
+            ? `drop-shadow(0 0 12px ${color}88)`
+            : `drop-shadow(0 5px 10px ${dark}55)`,
+          width:"100%",
+        }}>
+          {blobContent}
+        </button>
+      )}
 
       <span style={{
         fontSize:13, fontWeight:800, color:"#1e1e1e",
