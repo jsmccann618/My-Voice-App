@@ -260,17 +260,17 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
   const uid = `bc_${item.id}`;
   const hasMenu = item.subMenu?.food?.length > 0;
 
-  // Auto deep link map — if item name matches, open the app
+  // Auto deep link map
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const DEEP_LINKS = {
-    "youtube":      { app: isIOS ? "youtube://" : "https://www.youtube.com", web: "https://www.youtube.com" },
-    "disney+":      { app: isIOS ? "disneyplus://" : "https://www.disneyplus.com", web: "https://www.disneyplus.com" },
+    "youtube":      { app: "youtube://",      web: "https://www.youtube.com" },
+    "disney+":      { app: "disneyplus://",   web: "https://www.disneyplus.com" },
     "amazon music": { app: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune", web: "https://music.amazon.com/user-playlists/7e3811cb6f5b46e393412e79785cb73sune" },
-    "netflix":      { app: isIOS ? "nflx://" : "https://www.netflix.com", web: "https://www.netflix.com" },
-    "hulu":         { app: isIOS ? "hulu://" : "https://www.hulu.com", web: "https://www.hulu.com" },
-    "spotify":      { app: isIOS ? "spotify://" : "https://open.spotify.com", web: "https://open.spotify.com" },
-    "apple music":  { app: isIOS ? "music://" : "https://music.apple.com", web: "https://music.apple.com" },
-    "youtube kids": { app: isIOS ? "youtubekids://" : "https://www.youtubekids.com", web: "https://www.youtubekids.com" },
+    "netflix":      { app: "nflx://",         web: "https://www.netflix.com" },
+    "hulu":         { app: "hulu://",         web: "https://www.hulu.com" },
+    "spotify":      { app: "spotify://",      web: "https://open.spotify.com" },
+    "apple music":  { app: "music://",        web: "https://music.apple.com" },
+    "youtube kids": { app: "youtubekids://",  web: "https://www.youtubekids.com" },
   };
 
   function handlePress() {
@@ -278,7 +278,6 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
     setSquish(true);
     setTimeout(() => setSquish(false), 300);
 
-    // If this item has a restaurant sub-menu, open the menu flow instead of speaking
     if (hasMenu) {
       onOpenMenu(item);
       return;
@@ -287,25 +286,17 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
     const full = phrase ? `${phrase} ${item.name}` : item.name;
     speak(full);
 
-    // Check item's own appLink first, then check name against deep link map
     const nameKey = item.name.toLowerCase().trim();
     const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
 
-    onSpeak(full, !!deepLink); // pass isAppItem = true if it has a deep link
+    onSpeak(full, !!deepLink);
 
     if (deepLink) {
-      if (isIOS) {
-        const start = Date.now();
-        window.location = deepLink.app;
-        setTimeout(() => {
-          if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
-        }, 1500);
-      } else {
-        // Android — use intent URL to force open in Chrome browser
-        // which will then handle the universal link and open the app
-        const intentUrl = `intent:${deepLink.app.replace(/^https?:\/\//, '//')}#Intent;scheme=https;action=android.intent.action.VIEW;end`;
-        window.location.href = intentUrl;
-      }
+      const start = Date.now();
+      window.location = deepLink.app;
+      setTimeout(() => {
+        if (Date.now() - start < 2000) window.open(deepLink.web, "_blank");
+      }, 1500);
     }
   }
 
@@ -347,40 +338,47 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
 
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", position:"relative" }}>
-      {/* On Android with a deep link, use a real anchor tag for reliable app opening */}
-      {deepLink && isAndroid && !parentMode ? (
-        <a href={deepLink.app} style={{
-          background:"none", textDecoration:"none", padding:0,
-          display:"flex", flexDirection:"column", alignItems:"center",
-          transform: squish ? "scale(1.08) scaleY(0.88)" : "scale(1)",
-          transition:"transform 0.18s cubic-bezier(0.34,1.56,0.64,1)",
-          filter: squish ? `drop-shadow(0 0 12px ${color}88)` : `drop-shadow(0 5px 10px ${dark}55)`,
-          width:"100%",
-        }} onClick={()=>{
-          setSquish(true);
-          setTimeout(()=>setSquish(false), 300);
-          const full = phrase ? `${phrase} ${item.name}` : item.name;
-          speak(full);
-          onSpeak(full, true);
-        }}>
-          {blobContent}
-        </a>
-      ) : (
-        <button onClick={handlePress} style={{
-          background:"none", border:"none",
-          cursor: parentMode ? "default" : "pointer",
-          padding: 0,
-          display:"flex", flexDirection:"column", alignItems:"center",
-          transform: squish ? "scale(1.08) scaleY(0.88)" : "scale(1)",
-          transition: "transform 0.18s cubic-bezier(0.34,1.56,0.64,1)",
-          filter: squish
-            ? `drop-shadow(0 0 12px ${color}88)`
-            : `drop-shadow(0 5px 10px ${dark}55)`,
-          width:"100%",
-        }}>
-          {blobContent}
-        </button>
-      )}
+      <button onClick={handlePress} style={{
+        background:"none", border:"none",
+        cursor: parentMode ? "default" : "pointer",
+        padding: 0,
+        display:"flex", flexDirection:"column", alignItems:"center",
+        transform: squish ? "scale(1.08) scaleY(0.88)" : "scale(1)",
+        transition: "transform 0.18s cubic-bezier(0.34,1.56,0.64,1)",
+        filter: squish
+          ? `drop-shadow(0 0 12px ${color}88)`
+          : `drop-shadow(0 5px 10px ${dark}55)`,
+        width:"100%",
+      }}>
+        <svg viewBox="0 0 100 100" style={{ width:150, height:150, display:"block", overflow:"visible" }}>
+          <defs>
+            <radialGradient id={`${uid}_g`} cx="38%" cy="30%" r="65%">
+              <stop offset="0%" stopColor={light} />
+              <stop offset="50%" stopColor={color} />
+              <stop offset="100%" stopColor={dark} />
+            </radialGradient>
+            <clipPath id={`${uid}_c`}><path d={blobPath} /></clipPath>
+          </defs>
+          <path d={blobPath} fill={`url(#${uid}_g)`} />
+          {item.logo && !item.photo && (
+            <path d={blobPath} fill="white" opacity="0.92" />
+          )}
+          {item.photo && (
+            <image href={item.photo} x="8" y="8" width="84" height="84"
+              clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid slice" opacity="0.9" />
+          )}
+          {item.logo && !item.photo && (
+            <image href={item.logo} x="12" y="12" width="76" height="76"
+              clipPath={`url(#${uid}_c)`} preserveAspectRatio="xMidYMid meet" />
+          )}
+          {!item.photo && !item.logo && (
+            <text x="50" y="55" textAnchor="middle" dominantBaseline="middle"
+              fontSize="38" style={{ userSelect:"none", pointerEvents:"none" }}>{item.emoji}</text>
+          )}
+          <ellipse cx="36" cy="26" rx="14" ry="9" fill="white" opacity="0.28" transform="rotate(-20,36,26)" />
+          <ellipse cx="30" cy="22" rx="6" ry="3.5" fill="white" opacity="0.38" transform="rotate(-20,30,22)" />
+        </svg>
+      </button>
 
       <span style={{
         fontSize:13, fontWeight:800, color:"#1e1e1e",
