@@ -862,7 +862,7 @@ function RestaurantOrderScreen({ item, color, dark, light, onBack, onComplete })
           ✅ {selectedFood.name}
         </div>
       )}
-      <div style={{ flex:1, padding:"16px 12px 40px", display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))", gap:12, alignContent:"start" }}>
+      <div style={{ flex:1, padding:"16px 20px 40px", display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:16, alignContent:"start" }}>
         {options.map((opt, i) => {
           const blobPath = BLOB_PATHS[i % BLOB_PATHS.length];
           const uid = `ro_${opt.id}`;
@@ -1276,7 +1276,7 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpok
       </div>
 
       {/* Grid */}
-      <div style={{ flex:1,overflowY:"auto",padding:"6px 12px 40px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:8,alignContent:"start" }}>
+      <div style={{ flex:1,overflowY:"auto",padding:"6px 20px 40px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:16,alignContent:"start" }}>
         {filtered.length===0 && (
           <div style={{ gridColumn:"1/-1",textAlign:"center",padding:30,color:"#aaa",fontFamily:"'Nunito',sans-serif",fontSize:15 }}>
             {search ? "Nothing found — tap the camera button to add it!" : "No items yet!"}
@@ -1510,7 +1510,7 @@ function HomeScreen({ categories, onSelectCategory, onOpenSettings, onOpenCompan
         </div>
       </div>
 
-      <div style={{ padding:"16px 10px 40px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, alignItems:"start" }}>
+      <div style={{ padding:"16px 20px 40px", display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:16, alignItems:"start" }}>
         {categories.map((cat,i) => (
           <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode} onClick={()=>onSelectCategory(cat)} />
         ))}
@@ -2285,7 +2285,7 @@ export default function MyVoiceApp() {
   }
 
   return (
-    <div style={{ maxWidth:480,margin:"0 auto",fontFamily:"'Nunito',sans-serif" }}>
+    <div style={{ maxWidth:"100%", width:"100%", fontFamily:"'Nunito',sans-serif" }}>
       <OnMyWayBanner show={showOnMyWay} />
       {!loaded && (
         <div style={{ minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,background:"linear-gradient(135deg,#667eea,#764ba2)" }}>
@@ -2391,26 +2391,30 @@ export default function MyVoiceApp() {
           {/* Last Request Bar */}
           {lastRequest && (
             <div style={{
-              background:"#1a1a2e", padding:"12px 20px",
+              background:"#1a1a2e", padding:"16px 20px",
               display:"flex", alignItems:"center", justifyContent:"space-between", gap:12,
+              borderBottom:"3px solid #667eea",
             }}>
-              <div style={{ display:"flex", alignItems:"center", gap:10, flex:1, minWidth:0 }}>
-                <span style={{ fontSize:18, flexShrink:0 }}>🗣️</span>
-                <span style={{
-                  fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:14,
-                  color:"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
-                }}>"{lastRequest}"</span>
+              <div style={{ display:"flex", alignItems:"center", gap:12, flex:1, minWidth:0 }}>
+                <span style={{ fontSize:26, flexShrink:0 }}>🗣️</span>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontFamily:"'Nunito',sans-serif", fontWeight:700, fontSize:11, color:"rgba(255,255,255,0.5)", marginBottom:2 }}>LAST REQUEST</div>
+                  <div style={{
+                    fontFamily:"'Nunito',sans-serif", fontWeight:900, fontSize:18,
+                    color:"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+                  }}>"{lastRequest}"</div>
+                </div>
               </div>
               <button onClick={clearLastRequest} style={{
-                background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8,
-                padding:"4px 10px", cursor:"pointer", color:"#fff", fontSize:12,
-                fontFamily:"'Nunito',sans-serif", fontWeight:700, flexShrink:0,
+                background:"rgba(255,255,255,0.15)", border:"none", borderRadius:10,
+                padding:"6px 14px", cursor:"pointer", color:"#fff", fontSize:13,
+                fontFamily:"'Nunito',sans-serif", fontWeight:800, flexShrink:0,
               }}>✕ Clear</button>
             </div>
           )}
 
           {/* Category Grid OR Search Results */}
-          <div style={{ padding:"16px 10px 40px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, alignItems:"start" }}>
+          <div style={{ padding:"16px 20px 40px", display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))", gap:16, alignItems:"start" }}>
             {globalSearch ? (
               searchResults.length > 0 ? searchResults.map(({item, category}) => (
                 <div key={item.id} style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
