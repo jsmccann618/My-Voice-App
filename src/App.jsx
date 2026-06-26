@@ -1341,7 +1341,7 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpok
 }
 
 // ─── Settings Screen ──────────────────────────────────────────────────────────
-function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, currentPin, deviceMode, onSwitchMode }) {
+function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, currentPin }) {
   const [showCatPhoto, setShowCatPhoto] = useState(null);
   const [showEditCat, setShowEditCat] = useState(null);
   const [showAddCat, setShowAddCat] = useState(false);
@@ -1495,25 +1495,6 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
             style={{ width:"100%",padding:"10px 14px",borderRadius:12,border:"2px solid #e0e0e0",fontSize:18,fontFamily:"'Nunito',sans-serif",fontWeight:800,outline:"none",boxSizing:"border-box",letterSpacing:8,marginBottom:10 }} />
           <button onClick={handlePinChange} style={{ width:"100%",padding:12,borderRadius:12,border:"none",background:"#667eea",color:"#fff",fontFamily:"'Nunito',sans-serif",fontWeight:800,cursor:"pointer",fontSize:15 }}>Update PIN</button>
           {pinMsg && <div style={{ textAlign:"center",marginTop:8,fontFamily:"'Nunito',sans-serif",color:pinMsg.startsWith("✅")?"#10B981":"#EF4444",fontWeight:700 }}>{pinMsg}</div>}
-        </div>
-
-        <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:16,color:"#1a1a2e",margin:"24px 0 12px" }}>This Device</div>
-        <div style={{ background:"#fff",borderRadius:18,padding:18,boxShadow:"0 3px 12px rgba(0,0,0,0.07)" }}>
-          <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:14,color:"#1a1a2e",marginBottom:4,fontWeight:700 }}>
-            Currently in: {deviceMode === "school" ? "🎒 School Mode" : "🏠 Home Mode"}
-          </div>
-          <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:12,color:"#999",marginBottom:14 }}>
-            {deviceMode === "school"
-              ? "Data is stored on this device only and works offline."
-              : "Data syncs to the cloud and across devices in Home Mode."}
-          </div>
-          <button onClick={onSwitchMode} style={{
-            width:"100%",padding:12,borderRadius:12,border:"2px solid #EF4444",
-            background:"transparent",color:"#EF4444",fontFamily:"'Nunito',sans-serif",
-            fontWeight:800,cursor:"pointer",fontSize:14,
-          }}>
-            🔄 Switch to {deviceMode === "school" ? "Home" : "School"} Mode
-          </button>
         </div>
       </div>
     </div>
@@ -2344,7 +2325,7 @@ export default function MyVoiceApp() {
           <div style={{ fontSize:52 }}>🗣️</div>
           <div style={{ color:"#fff",fontSize:22,fontWeight:800,fontFamily:"'Nunito',sans-serif" }}>My Voice</div>
           <div style={{ color:"rgba(255,255,255,0.8)",fontSize:14,fontFamily:"'Nunito',sans-serif" }}>
-            {deviceMode === "school" ? "Loading (offline ready)..." : "Loading..."}
+            Loading...
           </div>
         </div>
       )}
@@ -2379,9 +2360,9 @@ export default function MyVoiceApp() {
                 <div style={{ color:"rgba(255,255,255,0.8)",fontSize:13,fontFamily:"'Nunito',sans-serif",marginTop:3 }}>
                   {parentMode ? "✏️ Edit Mode" : schoolMode ? "🎒 School Mode" : "Tap a button to speak!"}
                 </div>
-                {deviceMode === "school" && (
+                {schoolMode && (
                   <div style={{ display:"inline-block", marginTop:4, background:"rgba(255,255,255,0.25)", borderRadius:8, padding:"2px 10px", color:"#fff", fontSize:11, fontWeight:800, fontFamily:"'Nunito',sans-serif" }}>
-                    🎒 School Mode {navigator.onLine ? "" : "(Offline)"}
+                    🎒 School Mode
                   </div>
                 )}
               </div>
