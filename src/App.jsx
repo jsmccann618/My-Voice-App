@@ -2168,13 +2168,15 @@ export default function MyVoiceApp() {
 
     // Load home data
     loadFromFirestore(SEED_DATA).then(d => {
+      let needsSave = false;
       const fixed = {
         ...d,
         categories: d.categories.map(cat => {
           // Force re-enable watch and listen categories
-          if (cat.id === "watch" || cat.id === "listen") {
+          if ((cat.id === "watch" || cat.id === "listen") && (cat.disabled || cat.timeStart !== undefined || cat.monthStart !== undefined)) {
+            needsSave = true;
             const { disabled, timeStart, timeEnd, monthStart, monthEnd, ...rest } = cat;
-            return { ...rest, disabled: false };
+            return rest;
           }
           return cat;
         }).map(cat => ({
@@ -2186,8 +2188,8 @@ export default function MyVoiceApp() {
           })
         }))
       };
+      if (needsSave) saveData(fixed);
       setData(fixed);
-      saveData(fixed);
       if (fixed.voiceMode) setVoiceMode(true);
       setLoaded(true);
     });
