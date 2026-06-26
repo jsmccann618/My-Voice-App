@@ -7,7 +7,7 @@ const FONT_LINK = "https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 const SEED_CATEGORIES = [
   {
-    id:"eat", label:"I Want to Eat", emoji:"🍽️", photo:null,
+    id:"eat", label:"Food & Drinks", emoji:"🍽️", photo:null,
     color:"#FF6B35", dark:"#C94A1A", light:"#FFAA85", phrase:"I want to eat",
     items:[
       {id:"e1",name:"Pizza",emoji:"🍕",photo:null},
@@ -83,12 +83,10 @@ const SEED_CATEGORIES = [
       {
         id:"w1", name:"YouTube", emoji:"▶️", photo:null,
         logo:"https://www.youtube.com/img/desktop/yt_1200.png",
-        appLink:"youtube://", webLink:"https://www.youtube.com",
       },
       {
         id:"w2", name:"Disney+", emoji:"✨", photo:null,
         logo:"https://cnbl-cdn.bamgrid.com/assets/7ecc8bcb60ad77193058d63e321bd21cbac2fc67625b0a9de6c88b3155c19c69/original",
-        appLink:"disneyplus://", webLink:"https://www.disneyplus.com",
       },
     ],
   },
@@ -215,23 +213,32 @@ function speak(text) {
 
   function pickVoiceAndSpeak() {
     const voices = window.speechSynthesis.getVoices();
-    // Preferred male voices by name across iOS, macOS, Android, Windows
     const maleNames = ["Alex","Fred","Daniel","Aaron","Arthur","Gordon","Reed","Thomas","Rishi","Microsoft David","Microsoft Mark","Google US English"];
     let chosen = null;
     for (const name of maleNames) {
       const match = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
       if (match) { chosen = match; break; }
     }
-    // Fallback: any English voice, drop pitch lower to sound more male
     if (!chosen) {
       chosen = voices.find(v => v.lang.startsWith("en")) || null;
       u.pitch = 0.75;
     }
     if (chosen) u.voice = chosen;
+
+    // Try to boost volume using Web Audio API
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        const ctx = new AudioContext();
+        const gain = ctx.createGain();
+        gain.gain.value = 2.0; // boost by 2x
+        gain.connect(ctx.destination);
+      }
+    } catch(e) {}
+
     window.speechSynthesis.speak(u);
   }
 
-  // Voices may not be loaded yet on first call — wait if needed
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) {
     pickVoiceAndSpeak();
@@ -262,14 +269,13 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
 
   // Auto deep link map — if item name matches, open the app
   const DEEP_LINKS = {
-    "youtube":       { app: "youtube://",      web: "https://www.youtube.com" },
-    "disney+":       { app: "disneyplus://",   web: "https://www.disneyplus.com" },
-    "amazon music":  { app: "https://music.amazon.com", web: "https://music.amazon.com" },
-    "netflix":       { app: "nflx://",         web: "https://www.netflix.com" },
-    "hulu":          { app: "hulu://",         web: "https://www.hulu.com" },
-    "spotify":       { app: "spotify://",      web: "https://www.spotify.com" },
-    "apple music":   { app: "music://",        web: "https://music.apple.com" },
-    "youtube kids":  { app: "youtubekids://",  web: "https://www.youtubekids.com" },
+    "youtube":      { app: "youtube://www.youtube.com", web: "https://www.youtube.com" },
+    "disney+":      { app: "disneyplus://www.disneyplus.com", web: "https://www.disneyplus.com" },
+    "amazon music": { app: "intent://#Intent;package=com.amazon.mp3;S.browser_fallback_url=https://music.amazon.com;end", web: "https://music.amazon.com" },
+    "netflix":      { app: "nflx://www.netflix.com", web: "https://www.netflix.com" },
+    "hulu":         { app: "hulu://www.hulu.com", web: "https://www.hulu.com" },
+    "spotify":      { app: "spotify://open.spotify.com", web: "https://open.spotify.com" },
+    "youtube kids": { app: "youtubekids://www.youtubekids.com", web: "https://www.youtubekids.com" },
   };
 
   function handlePress() {
@@ -282,19 +288,34 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
       return;
     }
 
-    const full = phrase ? `${phrase} ${item.name}` : item.name;
-    speak(full);
-    onSpeak(full, !!( item.appLink || DEEP_LINKS[item.name.toLowerCase().trim()] ));
+    // Use itemType to determine phrase for food/drink items
+    let phraseToUse = phrase;
+    if (item.itemType === "drink") phraseToUse = "I want to drink";
+    else if (item.itemType === "food") phraseToUse = "I want to eat";
 
-    // Check item's own appLink first, then check name against deep link map
+    const full = phraseToUse ? `${phraseToUse} ${item.name}` : item.name;
+    speak(full);
+
     const nameKey = item.name.toLowerCase().trim();
-    const deepLink = item.appLink ? { app: item.appLink, web: item.webLink } : DEEP_LINKS[nameKey];
+    const deepLink = item.appLink
+      ? { app: item.appLink, web: item.webLink || item.appLink }
+      : DEEP_LINKS[nameKey];
+
+    onSpeak(full, !!deepLink);
 
     if (deepLink) {
-      window.location = deepLink.app;
+      let url = deepLink.app;
+      // Convert music://albums/ASIN to Amazon Music https URL
+      if (url && url.startsWith("music://albums/")) {
+        const asin = url.replace("music://albums/", "").split("?")[0].toUpperCase();
+        url = `https://music.amazon.com/albums/${asin}`;
+      }
+      // For ALL links — navigate to URL (Android intercepts and opens app)
+      // then immediately redirect back to PWA home
+      window.location.href = url;
       setTimeout(() => {
-        window.open(deepLink.web, "_blank");
-      }, 2000);
+        window.location.href = "/";
+      }, 100);
     }
   }
 
@@ -626,12 +647,14 @@ const EMOJIS = ["🍕","🍔","🌮","🍦","🍎","🧃","🏠","🌳","🚗","
   "🌈","⭐","❤️","🎉","🌟","✅","❌","🙏","✋","➕","🤷","🤔","🔑","🧸","🎁",
   "🍗","🧀","🥪","🥦","🍟","🧁","🍩","🥤","☀️","🌙","⚡","🔥","💧","🌊"];
 
-function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, initialName="", nameOptional=false }) {
+function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, initialName="", nameOptional=false, showLinkField=false, initialLink="", showTypeField=false, initialType="" }) {
   const cam = useCamera();
   const [photo, setPhoto] = useState(null);
   const [name, setName] = useState(initialName);
   const [emoji, setEmoji] = useState("⭐");
   const [tab, setTab] = useState("camera");
+  const [appLink, setAppLink] = useState(initialLink);
+  const [itemType, setItemType] = useState(initialType || "food"); // "food" or "drink"
 
   useEffect(() => {
     if (tab==="camera" && !photo) cam.start();
@@ -657,9 +680,8 @@ function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, i
 
   function handleSave() {
     if (showNameField && !nameOptional && !name.trim()) return;
-    // On emoji tab, explicitly pass null for photo so emoji shows
     const photoToSave = tab === "emoji" ? null : photo;
-    onSave({ name:name.trim(), emoji, photo:photoToSave });
+    onSave({ name:name.trim(), emoji, photo:photoToSave, appLink:appLink.trim(), itemType });
   }
 
   const canSave = (showNameField && !nameOptional) ? !!name.trim() : true;
@@ -723,6 +745,38 @@ function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, i
             <input value={name} onChange={e=>setName(e.target.value)}
               placeholder={nameOptional ? "Optional: name this (e.g. Red Shirt)" : "Name this item (e.g. McDonald's)"}
               style={{ width:"100%",padding:"12px 16px",borderRadius:14,border:"2px solid #e0e0e0",fontSize:16,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:"none",boxSizing:"border-box",marginBottom:14 }} />
+          )}
+          {showTypeField && (
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:13,color:"#666",marginBottom:8 }}>
+                Is this a food or drink?
+              </div>
+              <div style={{ display:"flex", gap:10 }}>
+                <button onClick={()=>setItemType("food")} style={{
+                  flex:1, padding:"12px 0", borderRadius:14, border:`2px solid ${itemType==="food"?color:"#e0e0e0"}`,
+                  background:itemType==="food"?color:"#fff", color:itemType==="food"?"#fff":"#666",
+                  fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, cursor:"pointer",
+                }}>🍔 Food</button>
+                <button onClick={()=>setItemType("drink")} style={{
+                  flex:1, padding:"12px 0", borderRadius:14, border:`2px solid ${itemType==="drink"?color:"#e0e0e0"}`,
+                  background:itemType==="drink"?color:"#fff", color:itemType==="drink"?"#fff":"#666",
+                  fontFamily:"'Nunito',sans-serif", fontWeight:800, fontSize:15, cursor:"pointer",
+                }}>🥤 Drink</button>
+              </div>
+            </div>
+          )}
+          {showLinkField && (
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:700,fontSize:13,color:"#666",marginBottom:6 }}>
+                🔗 App Link (optional)
+              </div>
+              <input value={appLink} onChange={e=>setAppLink(e.target.value)}
+                placeholder="e.g. music://albums/B097XPVXCW"
+                style={{ width:"100%",padding:"12px 16px",borderRadius:14,border:"2px solid #e0e0e0",fontSize:14,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:"none",boxSizing:"border-box" }} />
+              <div style={{ fontFamily:"'Nunito',sans-serif",fontSize:11,color:"#aaa",marginTop:4 }}>
+                Paste the album or app link here — tapping this button will open it directly
+              </div>
+            </div>
           )}
           <button onClick={handleSave} disabled={!canSave} style={{
             width:"100%",padding:14,borderRadius:14,border:"none",
@@ -1161,30 +1215,31 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpok
     onUpdateCategory({ ...category, items: updated });
   }
 
-  async function handleSaveItem({ name, emoji, photo }) {
+  async function handleSaveItem({ name, emoji, photo, appLink, itemType }) {
     const id = `c_${Date.now()}`;
     let photoUrl = null;
     if (photo && photo.startsWith("data:")) {
-      // It's a base64 image — upload to Firebase Storage
       photoUrl = await handlePhotoUpload(photo, `items/${category.id}/${id}`);
     } else if (photo && photo.startsWith("http")) {
-      // Already a URL — use as is
       photoUrl = photo;
     }
-    // If no photo, just use emoji (photoUrl stays null)
-    persist([...items, { id, name, emoji, photo: photoUrl }]);
+    const newItem = { id, name, emoji, photo: photoUrl };
+    if (appLink) newItem.appLink = appLink;
+    if (itemType) newItem.itemType = itemType;
+    persist([...items, newItem]);
   }
 
-  async function handleEditItem({ name, emoji, photo }) {
+  async function handleEditItem({ name, emoji, photo, appLink, itemType }) {
     let photoUrl = photo;
     if (photo && photo.startsWith("data:")) {
-      // New base64 image — upload to Firebase Storage
       photoUrl = await handlePhotoUpload(photo, `items/${category.id}/${editItem.id}`);
     } else if (!photo) {
-      // No photo selected — keep existing
       photoUrl = editItem.photo;
     }
-    persist(items.map(i => i.id===editItem.id ? { ...i, name, emoji, photo:photoUrl } : i));
+    const updated = { ...editItem, name, emoji, photo:photoUrl };
+    if (appLink !== undefined) updated.appLink = appLink || null;
+    if (itemType) updated.itemType = itemType;
+    persist(items.map(i => i.id===editItem.id ? updated : i));
     setEditItem(null);
   }
 
@@ -1197,6 +1252,8 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpok
     setLastSpoken(text);
     setConfetti(true);
     setTimeout(()=>setConfetti(false), 1600);
+    // Speak the phrase out loud
+    speak(text);
     // Send to parent companion via Supabase
     sendMessage(text);
     // Send push notification to parent's phone via Pushover
@@ -1232,7 +1289,9 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpok
       <Confetti active={confetti} />
       {showAdd && (
         <PhotoPickerModal title="Add New Item" color={category.color}
-          onSave={d=>{ handleSaveItem(d); setShowAdd(false); }} onClose={()=>setShowAdd(false)} />
+          onSave={d=>{ handleSaveItem(d); setShowAdd(false); }} onClose={()=>setShowAdd(false)}
+          showLinkField={true}
+          showTypeField={category.label?.toLowerCase().includes("food") || category.label?.toLowerCase().includes("drink")} />
       )}
       {scheduleItem && (
         <ScheduleModal item={scheduleItem} color={category.color}
@@ -1241,7 +1300,10 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpok
       )}
       {editItem && (
         <PhotoPickerModal title={`Edit: ${editItem.name}`} color={category.color} initialName={editItem.name}
-          onSave={handleEditItem} onClose={()=>setEditItem(null)} />
+          onSave={handleEditItem} onClose={()=>setEditItem(null)}
+          showLinkField={true} initialLink={editItem.appLink || ""}
+          showTypeField={category.label?.toLowerCase().includes("food") || category.label?.toLowerCase().includes("drink")}
+          initialType={editItem.itemType || "food"} />
       )}
 
       {/* Header */}
@@ -2217,9 +2279,25 @@ export default function MyVoiceApp() {
 
     // Home Mode — load from Firestore as before
     loadFromFirestore(SEED_DATA).then(d => {
-      setData(d);
+      // Force correct URLs for YouTube and Disney+ — use https so Android intercepts
+      const fixed = {
+        ...d,
+        categories: d.categories.map(cat => ({
+          ...cat,
+          items: (cat.items || []).map(item => {
+            if (item.name?.toLowerCase() === "youtube") {
+              return { ...item, appLink: "https://www.youtube.com", webLink: "https://www.youtube.com" };
+            }
+            if (item.name?.toLowerCase() === "disney+") {
+              return { ...item, appLink: "https://www.disneyplus.com", webLink: "https://www.disneyplus.com" };
+            }
+            return item;
+          })
+        }))
+      };
+      setData(fixed);
       setLoaded(true);
-      if (d.voiceMode) setVoiceMode(true);
+      if (fixed.voiceMode) setVoiceMode(true);
     });
     const sub = subscribeToMessages(msg => {
       if (msg.message === "👍 On my way!") {
