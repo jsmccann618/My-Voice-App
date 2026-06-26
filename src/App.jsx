@@ -2291,6 +2291,12 @@ export default function MyVoiceApp() {
     setSchoolModeLocal(newVal);
     setScreen("home");
     setGlobalSearch("");
+    // Reload the appropriate data fresh from Firebase when switching
+    if (newVal) {
+      loadFromFirestore(SCHOOL_SEED_DATA, "school").then(d => setSchoolData(d));
+    } else {
+      loadFromFirestore(SEED_DATA).then(d => setData(d));
+    }
   }
 
   function handleToggleParent() {
