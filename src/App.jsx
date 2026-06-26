@@ -2244,10 +2244,16 @@ export default function MyVoiceApp() {
       if (fixed.voiceMode) setVoiceMode(true);
     });
 
-    // Load school data — always initialize with school seed data
-    // to ensure it's separate from home data
-    saveToFirestore(SCHOOL_SEED_DATA, "school").then(() => {
-      setSchoolData(SCHOOL_SEED_DATA);
+    // Load school data separately
+    loadFromFirestore(SCHOOL_SEED_DATA, "school").then(d => {
+      // Check if school doc has home categories — if so reset it
+      const hasHomeCategories = d.categories?.some(c => ["eat","watch","listen","go","do","feel","help","yesno"].includes(c.id));
+      if (hasHomeCategories) {
+        saveToFirestore(SCHOOL_SEED_DATA, "school");
+        setSchoolData(SCHOOL_SEED_DATA);
+      } else {
+        setSchoolData(d);
+      }
       setLoaded(true);
     });
 
