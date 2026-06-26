@@ -2244,17 +2244,10 @@ export default function MyVoiceApp() {
       if (fixed.voiceMode) setVoiceMode(true);
     });
 
-    // Load school data — force create with school seed data if needed
-    loadFromFirestore(SCHOOL_SEED_DATA, "school").then(d => {
-      // If school data looks like home data (has "eat" category), it loaded wrong data
-      // Force reset to school seed data
-      const hasHomeCategories = d.categories?.some(c => c.id === "eat" || c.id === "watch" || c.id === "listen");
-      if (hasHomeCategories) {
-        saveToFirestore(SCHOOL_SEED_DATA, "school");
-        setSchoolData(SCHOOL_SEED_DATA);
-      } else {
-        setSchoolData(d);
-      }
+    // Load school data — always initialize with school seed data
+    // to ensure it's separate from home data
+    saveToFirestore(SCHOOL_SEED_DATA, "school").then(() => {
+      setSchoolData(SCHOOL_SEED_DATA);
       setLoaded(true);
     });
 
