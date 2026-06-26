@@ -155,27 +155,15 @@ const SCHOOL_SEED_CATEGORIES = [
 
 const SCHOOL_SEED_DATA = { categories: SCHOOL_SEED_CATEGORIES, parentPin: "1234" };
 
-// ─── Mode & Local Storage Helpers ─────────────────────────────────────────────
-const MODE_KEY = "myvoice_device_mode"; // "home" or "school" — stays on THIS device only
-const SCHOOL_DATA_KEY = "myvoice_school_data"; // local copy of school mode data + photos
+// ─── School Mode helpers ──────────────────────────────────────────────────────
+const SCHOOL_MODE_KEY = "myvoice_school_mode";
 
-function getDeviceMode() {
-  try { return localStorage.getItem(MODE_KEY) || null; } catch { return null; }
+function getSchoolMode() {
+  try { return localStorage.getItem(SCHOOL_MODE_KEY) === "true"; } catch { return false; }
 }
 
-function setDeviceMode(mode) {
-  try { localStorage.setItem(MODE_KEY, mode); } catch {}
-}
-
-function loadSchoolDataLocal() {
-  try {
-    const s = localStorage.getItem(SCHOOL_DATA_KEY);
-    return s ? JSON.parse(s) : SCHOOL_SEED_DATA;
-  } catch { return SCHOOL_SEED_DATA; }
-}
-
-function saveSchoolDataLocal(data) {
-  try { localStorage.setItem(SCHOOL_DATA_KEY, JSON.stringify(data)); } catch(e) { console.error("Local save error:", e); }
+function setSchoolModeLocal(val) {
+  try { localStorage.setItem(SCHOOL_MODE_KEY, val ? "true" : "false"); } catch {}
 }
 
 function stripPhotos(categories) {
@@ -2224,8 +2212,8 @@ function ModeSelectorScreen({ onSelect }) {
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function MyVoiceApp() {
-  const [deviceMode, setDeviceModeState] = useState(null); // null = not chosen yet, "home" or "school"
   const [data, setData] = useState(SEED_DATA);
+  const [schoolData, setSchoolData] = useState(SCHOOL_SEED_DATA);
   const [loaded, setLoaded] = useState(false);
   const [screen, setScreen] = useState("home");
   const [activeCategory, setActiveCategory] = useState(null);
@@ -2236,6 +2224,7 @@ export default function MyVoiceApp() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [schoolMode, setSchoolMode] = useState(getSchoolMode);
   const [lastRequest, setLastRequest] = useState(() => {
     try { return localStorage.getItem("myvoice_last_request") || ""; } catch { return ""; }
   });
@@ -2250,55 +2239,36 @@ export default function MyVoiceApp() {
     try { localStorage.removeItem("myvoice_last_request"); } catch {}
   }
 
-  // Check for saved device mode on mount
-  useEffect(() => {
-    const saved = getDeviceMode();
-    if (saved) setDeviceModeState(saved);
-  }, []);
-
-  function handleSelectMode(mode) {
-    setDeviceMode(mode);
-    setDeviceModeState(mode);
-  }
+  const activeData = schoolMode ? schoolData : data;
 
   useEffect(() => {
-    if (!deviceMode) return; // wait until mode is chosen
-
     const link = document.createElement("link");
     link.rel = "stylesheet"; link.href = FONT_LINK;
     document.head.appendChild(link);
 
-    if (deviceMode === "school") {
-      // School Mode — load from local storage only, fully offline
-      const d = loadSchoolDataLocal();
-      setData(d);
-      setLoaded(true);
-      if (d.voiceMode) setVoiceMode(true);
-      return; // no Supabase subscription needed for school mode (Phase 1)
-    }
-
-    // Home Mode — load from Firestore as before
+    // Load home data
     loadFromFirestore(SEED_DATA).then(d => {
-      // Force correct URLs for YouTube and Disney+ — use https so Android intercepts
       const fixed = {
         ...d,
         categories: d.categories.map(cat => ({
           ...cat,
           items: (cat.items || []).map(item => {
-            if (item.name?.toLowerCase() === "youtube") {
-              return { ...item, appLink: "https://www.youtube.com", webLink: "https://www.youtube.com" };
-            }
-            if (item.name?.toLowerCase() === "disney+") {
-              return { ...item, appLink: "https://www.disneyplus.com", webLink: "https://www.disneyplus.com" };
-            }
+            if (item.name?.toLowerCase() === "youtube") return { ...item, appLink: "https://www.youtube.com", webLink: "https://www.youtube.com" };
+            if (item.name?.toLowerCase() === "disney+") return { ...item, appLink: "https://www.disneyplus.com", webLink: "https://www.disneyplus.com" };
             return item;
           })
         }))
       };
       setData(fixed);
-      setLoaded(true);
       if (fixed.voiceMode) setVoiceMode(true);
     });
+
+    // Load school data from separate Firestore doc
+    loadFromFirestore(SCHOOL_SEED_DATA, "school").then(d => {
+      setSchoolData(d);
+      setLoaded(true);
+    });
+
     const sub = subscribeToMessages(msg => {
       if (msg.message === "👍 On my way!") {
         setShowOnMyWay(true);
@@ -2307,33 +2277,40 @@ export default function MyVoiceApp() {
       }
     });
     return () => sub?.unsubscribe?.();
-  }, [deviceMode]);
+  }, []);
 
-  // Global search across all categories
   useEffect(() => {
     if (!globalSearch.trim()) { setSearchResults([]); return; }
     const q = globalSearch.toLowerCase();
     const results = [];
-    data.categories.forEach(cat => {
+    activeData.categories.forEach(cat => {
       cat.items?.forEach(item => {
-        if (item.name.toLowerCase().includes(q)) {
-          results.push({ item, category: cat });
-        }
+        if (item.name.toLowerCase().includes(q)) results.push({ item, category: cat });
       });
     });
     setSearchResults(results);
-  }, [globalSearch, data.categories]);
+  }, [globalSearch, activeData.categories]);
 
   function persist(updated) {
-    setData(updated);
-    if (deviceMode === "school") {
-      saveSchoolDataLocal(updated); // local only — Phase 1
+    if (schoolMode) {
+      setSchoolData(updated);
+      saveToFirestore(updated, "school");
     } else {
-      saveData(updated); // Firestore as before
+      setData(updated);
+      saveData(updated);
     }
   }
-  function updateCategory(c) { persist({ ...data, categories:data.categories.map(x=>x.id===c.id?c:x) }); }
-  function updateAllCategories(cats) { persist({ ...data, categories:cats }); }
+
+  function updateCategory(c) { persist({ ...activeData, categories:activeData.categories.map(x=>x.id===c.id?c:x) }); }
+  function updateAllCategories(cats) { persist({ ...activeData, categories:cats }); }
+
+  function toggleSchoolMode() {
+    const newVal = !schoolMode;
+    setSchoolMode(newVal);
+    setSchoolModeLocal(newVal);
+    setScreen("home");
+    setGlobalSearch("");
+  }
 
   function handleToggleParent() {
     if (parentMode) { setParentMode(false); }
@@ -2359,11 +2336,6 @@ export default function MyVoiceApp() {
     setSearchResults([]);
   }
 
-  // Show mode selector if this device hasn't chosen a mode yet
-  if (!deviceMode) {
-    return <ModeSelectorScreen onSelect={handleSelectMode} />;
-  }
-
   return (
     <div style={{ maxWidth:"100%", width:"100%", fontFamily:"'Nunito',sans-serif" }}>
       <OnMyWayBanner show={showOnMyWay} />
@@ -2377,13 +2349,13 @@ export default function MyVoiceApp() {
         </div>
       )}
       {showPinModal && (
-        <PinModal title="Parent Mode" correctPin={data.parentPin}
+        <PinModal title="Parent Mode" correctPin={activeData.parentPin}
           onSuccess={handlePinSuccess} onClose={()=>setShowPinModal(false)} />
       )}
       {loaded && screen==="home" && voiceMode && !parentMode && (
         <VoiceActivatedScreen
-          categories={data.categories}
-          parentPin={data.parentPin}
+          categories={activeData.categories}
+          parentPin={activeData.parentPin}
           onSpeak={(text) => {
             speak(text);
             sendMessage(text);
@@ -2405,7 +2377,7 @@ export default function MyVoiceApp() {
                 <div style={{ fontSize:32,marginBottom:2 }}>🗣️</div>
                 <div style={{ color:"#fff",fontSize:26,fontWeight:900,fontFamily:"'Nunito',sans-serif",lineHeight:1.1 }}>My Voice</div>
                 <div style={{ color:"rgba(255,255,255,0.8)",fontSize:13,fontFamily:"'Nunito',sans-serif",marginTop:3 }}>
-                  {parentMode ? "✏️ Edit Mode" : "Tap a button to speak!"}
+                  {parentMode ? "✏️ Edit Mode" : schoolMode ? "🎒 School Mode" : "Tap a button to speak!"}
                 </div>
                 {deviceMode === "school" && (
                   <div style={{ display:"inline-block", marginTop:4, background:"rgba(255,255,255,0.25)", borderRadius:8, padding:"2px 10px", color:"#fff", fontSize:11, fontWeight:800, fontFamily:"'Nunito',sans-serif" }}>
@@ -2428,10 +2400,19 @@ export default function MyVoiceApp() {
                   </button>
                 )}
                 {parentMode && (
+                  <button onClick={toggleSchoolMode} style={{
+                    background:schoolMode?"#10B981":"rgba(255,255,255,0.22)",
+                    border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",
+                    fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff"
+                  }}>
+                    {schoolMode ? "🎒 School Mode" : "🎒 School"}
+                  </button>
+                )}
+                {parentMode && (
                   <button onClick={()=>{
                     const newMode = !voiceMode;
                     setVoiceMode(newMode);
-                    persist({ ...data, voiceMode: newMode });
+                    persist({ ...activeData, voiceMode: newMode });
                   }} style={{
                     background:voiceMode?"#10B981":"rgba(255,255,255,0.22)",
                     border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",
@@ -2530,7 +2511,7 @@ export default function MyVoiceApp() {
                 </div>
               )
             ) : (
-              data.categories
+              activeData.categories
                 .filter(cat => parentMode || isAvailable(cat))
                 .map((cat,i) => (
                   <HomeBlobCard key={cat.id} cat={cat} index={i} parentMode={parentMode}
@@ -2543,7 +2524,7 @@ export default function MyVoiceApp() {
       )}
       {screen==="category" && activeCategory && (
         <CategoryScreen
-          category={data.categories.find(c=>c.id===activeCategory.id)||activeCategory}
+          category={activeData.categories.find(c=>c.id===activeCategory.id)||activeCategory}
           parentMode={parentMode}
           onBack={()=>setScreen("home")}
           onUpdateCategory={updateCategory}
@@ -2553,18 +2534,10 @@ export default function MyVoiceApp() {
         <ChoiceBoardScreen onBack={()=>setScreen("home")} />
       )}
       {loaded && screen==="settings" && (
-        <SettingsScreen categories={data.categories} currentPin={data.parentPin}
+        <SettingsScreen categories={activeData.categories} currentPin={activeData.parentPin}
           onUpdateCategories={updateAllCategories}
-          onChangePin={pin=>persist({...data,parentPin:pin})}
-          onBack={()=>setScreen("home")}
-          deviceMode={deviceMode}
-          onSwitchMode={()=>{
-            const newMode = deviceMode === "school" ? "home" : "school";
-            if (window.confirm(`Switch this device to ${newMode === "school" ? "School" : "Home"} Mode? The app will reload.`)) {
-              setDeviceMode(newMode);
-              window.location.reload();
-            }
-          }} />
+          onChangePin={pin=>persist({...activeData,parentPin:pin})}
+          onBack={()=>setScreen("home")} />
       )}
     </div>
   );
