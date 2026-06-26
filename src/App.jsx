@@ -2244,9 +2244,17 @@ export default function MyVoiceApp() {
       if (fixed.voiceMode) setVoiceMode(true);
     });
 
-    // Load school data from separate Firestore doc
+    // Load school data — force create with school seed data if needed
     loadFromFirestore(SCHOOL_SEED_DATA, "school").then(d => {
-      setSchoolData(d);
+      // If school data looks like home data (has "eat" category), it loaded wrong data
+      // Force reset to school seed data
+      const hasHomeCategories = d.categories?.some(c => c.id === "eat" || c.id === "watch" || c.id === "listen");
+      if (hasHomeCategories) {
+        saveToFirestore(SCHOOL_SEED_DATA, "school");
+        setSchoolData(SCHOOL_SEED_DATA);
+      } else {
+        setSchoolData(d);
+      }
       setLoaded(true);
     });
 
@@ -2282,7 +2290,11 @@ export default function MyVoiceApp() {
     }
   }
 
-  function updateCategory(c) { persist({ ...activeData, categories:activeData.categories.map(x=>x.id===c.id?c:x) }); }
+  function updateCategory(c) {
+    const exists = activeData.categories.find(x => x.id === c.id);
+    if (!exists) return; // Don't update if category doesn't exist in current mode
+    persist({ ...activeData, categories: activeData.categories.map(x => x.id===c.id ? c : x) });
+  }
   function updateAllCategories(cats) { persist({ ...activeData, categories:cats }); }
 
   function toggleSchoolMode() {
