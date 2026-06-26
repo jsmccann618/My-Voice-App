@@ -2170,7 +2170,14 @@ export default function MyVoiceApp() {
     loadFromFirestore(SEED_DATA).then(d => {
       const fixed = {
         ...d,
-        categories: d.categories.map(cat => ({
+        categories: d.categories.map(cat => {
+          // Force re-enable watch and listen categories
+          if (cat.id === "watch" || cat.id === "listen") {
+            const { disabled, timeStart, timeEnd, monthStart, monthEnd, ...rest } = cat;
+            return { ...rest, disabled: false };
+          }
+          return cat;
+        }).map(cat => ({
           ...cat,
           items: (cat.items || []).map(item => {
             if (item.name?.toLowerCase() === "youtube") return { ...item, appLink: "https://www.youtube.com", webLink: "https://www.youtube.com" };
@@ -2180,6 +2187,7 @@ export default function MyVoiceApp() {
         }))
       };
       setData(fixed);
+      saveData(fixed);
       if (fixed.voiceMode) setVoiceMode(true);
       setLoaded(true);
     });
