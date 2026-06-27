@@ -1341,7 +1341,7 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpok
 }
 
 // ─── Settings Screen ──────────────────────────────────────────────────────────
-function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, currentPin, onSave }) {
+function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, currentPin, onSave, onExport, onImport }) {
   const [showCatPhoto, setShowCatPhoto] = useState(null);
   const [showEditCat, setShowEditCat] = useState(null);
   const [showAddCat, setShowAddCat] = useState(false);
@@ -1433,9 +1433,29 @@ function SettingsScreen({ categories, onUpdateCategories, onBack, onChangePin, c
         <button onClick={onSave} style={{
           width:"100%", padding:16, borderRadius:14, border:"none",
           background:"#10B981", color:"#fff", fontSize:17, fontWeight:900,
-          fontFamily:"'Nunito',sans-serif", cursor:"pointer", marginBottom:20,
+          fontFamily:"'Nunito',sans-serif", cursor:"pointer", marginBottom:12,
           boxShadow:"0 4px 14px rgba(16,185,129,0.4)",
         }}>💾 Save All Data to Firebase</button>
+
+        {/* Export to JSON backup */}
+        <button onClick={onExport} style={{
+          width:"100%", padding:16, borderRadius:14, border:"none",
+          background:"#667eea", color:"#fff", fontSize:17, fontWeight:900,
+          fontFamily:"'Nunito',sans-serif", cursor:"pointer", marginBottom:12,
+          boxShadow:"0 4px 14px rgba(102,126,234,0.4)",
+        }}>📥 Export Backup to Device</button>
+
+        {/* Import from JSON backup */}
+        <label style={{
+          display:"block", width:"100%", padding:16, borderRadius:14,
+          background:"#F59E0B", color:"#fff", fontSize:17, fontWeight:900,
+          fontFamily:"'Nunito',sans-serif", cursor:"pointer", marginBottom:20,
+          boxShadow:"0 4px 14px rgba(245,158,11,0.4)", textAlign:"center",
+          boxSizing:"border-box",
+        }}>
+          📤 Import Backup from Device
+          <input type="file" accept=".json" onChange={onImport} style={{ display:"none" }} />
+        </label>
         <div style={{ fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:16,color:"#1a1a2e",marginBottom:12 }}>Categories</div>
         <div style={{ display:"flex",flexDirection:"column",gap:12,marginBottom:20 }}>
           {categories.map(cat=>(
@@ -2549,7 +2569,38 @@ export default function MyVoiceApp() {
           onUpdateCategories={updateAllCategories}
           onChangePin={pin=>persist({...activeData,parentPin:pin})}
           onBack={()=>setScreen("home")}
-          onSave={()=>{ saveData(activeData); alert("✅ Saved to Firebase successfully!"); }} />
+          onSave={()=>{ saveData(activeData); alert("✅ Saved to Firebase successfully!"); }}
+          onImport={(e)=>{
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              try {
+                const imported = JSON.parse(ev.target.result);
+                if (!imported.categories) { alert("❌ Invalid backup file!"); return; }
+                if (window.confirm(`Restore from ${file.name}? This will replace all current data.`)) {
+                  persist(imported);
+                  alert("✅ Restored successfully! Your data is back.");
+                }
+              } catch(err) {
+                alert("❌ Could not read backup file. Make sure it's a valid MyVoice backup.");
+              }
+            };
+            reader.readAsText(file);
+          }}
+          onExport={()=>{
+            const date = new Date().toISOString().slice(0,10);
+            const filename = `MyVoice_${date}.json`;
+            const json = JSON.stringify(activeData, null, 2);
+            const blob = new Blob([json], { type:"application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
+          }} />
       )}
     </div>
   );
