@@ -1171,7 +1171,7 @@ function ScheduleModal({ item, color, onSave, onClose }) {
   );
 }
 
-function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpoken }) {
+function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpoken, notificationsEnabled=true }) {
   const [items, setItems] = useState(category.items);
   const [search, setSearch] = useState("");
   const [lastSpoken, setLastSpoken] = useState("");
@@ -1243,11 +1243,13 @@ function CategoryScreen({ category, onBack, onUpdateCategory, parentMode, onSpok
     // Send to parent companion via Supabase
     sendMessage(text);
     // Send push notification to parent's phone via Pushover
-    fetch("/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
-    }).catch(e => console.error("Notify error:", e));
+    if (notificationsEnabled) {
+      fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      }).catch(e => console.error("Notify error:", e));
+    }
     // Update last request bar (not for app-opening items like YouTube)
     if (!isAppItem && onSpoken) onSpoken(text);
     // Navigate back to home screen after a short delay so he sees the confetti
@@ -2210,6 +2212,9 @@ export default function MyVoiceApp() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    try { return localStorage.getItem("myvoice_notifications") !== "false"; } catch { return true; }
+  });
   const [schoolMode, setSchoolMode] = useState(getSchoolMode);
   const [lastRequest, setLastRequest] = useState(() => {
     try { return localStorage.getItem("myvoice_last_request") || ""; } catch { return ""; }
@@ -2311,11 +2316,13 @@ export default function MyVoiceApp() {
     const full = category.phrase ? `${category.phrase} ${item.name}` : item.name;
     speak(full);
     sendMessage(full);
-    fetch("/api/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: full }),
-    }).catch(e => console.error("Notify error:", e));
+    if (notificationsEnabled) {
+      fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: full }),
+      }).catch(e => console.error("Notify error:", e));
+    }
     updateLastRequest(full);
     setGlobalSearch("");
     setSearchResults([]);
@@ -2344,7 +2351,9 @@ export default function MyVoiceApp() {
           onSpeak={(text) => {
             speak(text);
             sendMessage(text);
-            fetch("/api/notify", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message:text }) }).catch(()=>{});
+            if (notificationsEnabled) {
+              fetch("/api/notify", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ message:text }) }).catch(()=>{});
+            }
             updateLastRequest(text);
           }}
           onExit={()=>{
@@ -2380,12 +2389,16 @@ export default function MyVoiceApp() {
                   </button>
                 )}
                 {parentMode && (
-                  <button onClick={toggleSchoolMode} style={{
-                    background:schoolMode?"#10B981":"rgba(255,255,255,0.22)",
+                  <button onClick={()=>{
+                    const newVal = !notificationsEnabled;
+                    setNotificationsEnabled(newVal);
+                    try { localStorage.setItem("myvoice_notifications", newVal ? "true" : "false"); } catch {}
+                  }} style={{
+                    background:notificationsEnabled?"rgba(255,255,255,0.22)":"#EF4444",
                     border:"none",borderRadius:12,padding:"8px 14px",cursor:"pointer",
                     fontFamily:"'Nunito',sans-serif",fontWeight:800,fontSize:13,color:"#fff"
                   }}>
-                    {schoolMode ? "🎒 School Mode" : "🎒 School"}
+                    {notificationsEnabled ? "🔔 Notifs ON" : "🔕 Notifs OFF"}
                   </button>
                 )}
                 {parentMode && (
@@ -2525,7 +2538,8 @@ export default function MyVoiceApp() {
           parentMode={parentMode}
           onBack={()=>setScreen("home")}
           onUpdateCategory={updateCategory}
-          onSpoken={updateLastRequest} />
+          onSpoken={updateLastRequest}
+          notificationsEnabled={notificationsEnabled} />
       )}
       {loaded && screen==="choice" && (
         <ChoiceBoardScreen onBack={()=>setScreen("home")} />
