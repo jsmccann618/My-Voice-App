@@ -274,7 +274,7 @@ function BlobCard({ item, phrase, color, dark, light, index, onSpeak, onEdit, on
       return;
     }
 
-    // Use itemType to determine phrase for food/drink items
+    // Use itemType to determine phrase for food/drink items ONLY if explicitly set
     let phraseToUse = phrase;
     if (item.itemType === "drink") phraseToUse = "I want to drink";
     else if (item.itemType === "food") phraseToUse = "I want to eat";
@@ -640,7 +640,7 @@ function PhotoPickerModal({ title, color, onSave, onClose, showNameField=true, i
   const [emoji, setEmoji] = useState("⭐");
   const [tab, setTab] = useState("camera");
   const [appLink, setAppLink] = useState(initialLink);
-  const [itemType, setItemType] = useState(initialType || "food"); // "food" or "drink"
+  const [itemType, setItemType] = useState(initialType || "");
 
   useEffect(() => {
     if (tab==="camera" && !photo) cam.start();
@@ -2246,8 +2246,8 @@ export default function MyVoiceApp() {
         categories: d.categories.map(cat => ({
           ...cat,
           items: (cat.items || []).map(item => {
-            if (item.name?.toLowerCase() === "youtube") return { ...item, appLink: "https://www.youtube.com", webLink: "https://www.youtube.com" };
-            if (item.name?.toLowerCase() === "disney+") return { ...item, appLink: "https://www.disneyplus.com", webLink: "https://www.disneyplus.com" };
+            if (item.name?.toLowerCase() === "youtube") return { ...item, appLink: "https://www.youtube.com", webLink: "https://www.youtube.com", itemType: null };
+            if (item.name?.toLowerCase() === "disney+") return { ...item, appLink: "https://www.disneyplus.com", webLink: "https://www.disneyplus.com", itemType: null };
             return item;
           })
         }))
